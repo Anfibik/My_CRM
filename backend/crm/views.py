@@ -1,0 +1,305 @@
+from django.contrib.auth import authenticate
+from rest_framework import generics, viewsets, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework import status
+from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
+from django.db import IntegrityError
+from django.db.models import Q
+
+from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
+from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
+    DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
+from .permissions import IsDealAccess, NotCallOperator
+from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
+    DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
+
+
+class CompanyListCreateView(generics.ListCreateAPIView):
+    queryset = Company.objects.all()  # Получаем все компании
+    serializer_class = CompanySerializer  # Используем наш сериализатор
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+
+class CompanyDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+
+class ContactListCreateView(generics.ListCreateAPIView):
+    queryset = Contact.objects.all()
+    serializer_class = ContactSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Contact.objects.all()
+    serializer_class = ContactSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+
+class DealViewSet(viewsets.ModelViewSet):
+    queryset = Deal.objects.all()
+    serializer_class = DealSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator, IsDealAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Deal.objects.all()
+        if user.role in ('owner', 'top_manager'):
+            return qs
+        # Включаем сделки, где пользователь является ответственным, участником или аккаунтом
+        return qs.filter(Q(responsible=user) | Q(participants=user) | Q(account=user)).distinct()
+
+
+class LeadViewSet(viewsets.ModelViewSet):
+    queryset = Lead.objects.all()
+    serializer_class = LeadSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+
+class InquiryViewSet(viewsets.ModelViewSet):
+    queryset = Inquiry.objects.all()
+    serializer_class = InquirySerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """Сохраняем ответственного оператора при создании обращения"""
+        serializer.save(responsible=self.request.user)
+
+
+# Для событий
+class DealEventListCreateView(generics.ListCreateAPIView):
+    queryset = DealEvent.objects.all()
+    serializer_class = DealEventSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator, IsDealAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = DealEvent.objects.all()
+        # Фильтруем события по текущей сделке
+        deal_id = self.request.query_params.get('deal')
+        if deal_id:
+            qs = qs.filter(deal_id=deal_id)
+        if user.role in ('owner', 'top_manager'):
+            return qs.order_by('-created_at')
+        # Учитываем также аккаунт-менеджера по сделке
+        return qs.filter(
+            Q(deal__responsible=user) | Q(deal__participants=user) | Q(deal__account=user)
+        ).distinct().order_by('-created_at')
+
+
+class DealEventDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = DealEvent.objects.all()
+    serializer_class = DealEventSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator, IsDealAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = DealEvent.objects.all()
+        if user.role in ('owner', 'top_manager'):
+            return qs
+        return qs.filter(Q(deal__responsible=user) | Q(deal__participants=user) | Q(deal__account=user)).distinct()
+
+
+# Для следующего шага
+class NextStepListCreateView(generics.ListCreateAPIView):
+    queryset = NextStep.objects.all()
+    serializer_class = NextStepSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator, IsDealAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = NextStep.objects.all()
+        if user.role in ('owner', 'top_manager'):
+            return qs
+        return qs.filter(Q(deal__responsible=user) | Q(deal__participants=user) | Q(deal__account=user)).distinct()
+
+
+class NextStepDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = NextStep.objects.all()
+    serializer_class = NextStepSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator, IsDealAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = NextStep.objects.all()
+        if user.role in ('owner', 'top_manager'):
+            return qs
+        return qs.filter(Q(deal__responsible=user) | Q(deal__participants=user) | Q(deal__account=user)).distinct()
+
+
+class UserRegistrationView(generics.CreateAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserRegistrationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            token, _ = Token.objects.get_or_create(user=user)
+            return Response({
+                'token': token.key,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                    'department': user.department
+                }
+            }, status=status.HTTP_201_CREATED)
+        except IntegrityError as e:
+            # Ловим уникальное ограничение и возвращаем красивую ошибку
+            return Response(
+                {"work_email": ["Пользователь с такой рабочей почтой уже существует."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class UserLoginView(APIView):
+    def post(self, request):
+        email = request.data.get("email")  # Изменено с work_email на email
+        password = request.data.get("password")
+        
+        if not email or not password:
+            return Response(
+                {"error": "Необходимо указать email и пароль"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            token, _ = Token.objects.get_or_create(user=user)
+            return Response({
+                "token": token.key,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role,
+                    "department": user.department
+                }
+            }, status=status.HTTP_200_OK)
+        return Response(
+            {"error": "Неверный email или пароль"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "department": user.department
+        })
+
+
+# --- UserViewSet for employee selection in modal ---
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        department = self.request.query_params.get('department')
+        if department:
+            queryset = queryset.filter(department=department)
+        return queryset
+
+
+@api_view(['POST'])
+def convert_inquiry_view(request, pk):
+    """
+    Принимает POST /api/inquiries/<pk>/convert/
+    Конвертирует указанное обращение в Contact, Company, Lead, Deal
+    """
+    try:
+        inquiry = Inquiry.objects.get(pk=pk)
+
+        # 1. Компания
+        raw_name = inquiry.company_name or "Без названия"
+        # Подготовка имени с кавычками
+        formatted_name = raw_name if raw_name.startswith('"') and raw_name.endswith('"') else f'"{raw_name}"'
+        # Ищем существующую компанию по quoted или raw имени, игнорируя регистр
+        company = Company.objects.filter(name__iexact=formatted_name).first()
+        if not company:
+            company = Company.objects.filter(name__iexact=raw_name).first()
+        if not company:
+            # Создаём новую, save() добавит кавычки
+            company = Company.objects.create(name=raw_name, site=inquiry.company_site)
+
+        # 2. Контакт
+        contact, created = Contact.objects.get_or_create(
+            name=inquiry.full_name,
+            phone=inquiry.phone,
+            defaults={
+                'email': inquiry.email,
+                'messenger': inquiry.messenger,
+                'company': company
+            }
+        )
+        # По умолчанию сделать контакт главным для компании, если не задано
+        if not company.main_contact:
+            company.main_contact = contact
+            company.save(update_fields=['main_contact'])
+
+        # 3. Лид
+        lead_name = f"{contact.name} ({contact.company.name})"
+        department_assignments = request.data.get("department_assignments", {})
+        lead, lead_created = Lead.objects.get_or_create(
+            name=lead_name,
+            need=inquiry.need_description,
+            department_assignments=department_assignments,
+            defaults={
+                'contact': contact,
+                'status': 'new'
+            }
+        )
+        # Добавляем оператора в участники лида, если лид новый
+        if lead_created:
+            lead.participants.add(request.user)
+
+        # 4. Сделки по направлениям
+        deals = []
+        if lead_created:
+            # Создаем сделки только для нового лида
+            for dept, user_id in department_assignments.items():
+                responsible = CustomUser.objects.filter(id=user_id).first()
+                deal = Deal.objects.create(
+                    lead=lead,
+                    department=dept,
+                    responsible=responsible,
+                    status="need"
+                )
+                deals.append(deal.id)
+
+        # Обновить статус обращения
+        inquiry.status = "in_progress"
+        inquiry.save()
+
+        return Response({
+            "detail": "Обращение успешно конвертировано",
+            "contact_id": contact.id,
+            "company_id": company.id,
+            "lead_id": lead.id,
+            "deal_ids": deals
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"detail": f"Ошибка при конвертации: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
