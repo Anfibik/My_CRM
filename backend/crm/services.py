@@ -73,4 +73,3 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     inquiry.save()
 
     return lead  # или можно вернуть все созданные объекты
-
