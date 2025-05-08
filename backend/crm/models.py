@@ -137,6 +137,14 @@ class Lead(models.Model):
         related_name="leads",
         verbose_name="Контакт"
     )
+    inquiry = models.OneToOneField(
+        "Inquiry",
+        on_delete=models.CASCADE,
+        related_name="lead",
+        null=True,
+        blank=True,
+        verbose_name="Обращение"
+    )
     need = models.TextField(verbose_name="Потребность")
     name = models.CharField(
         max_length=255,

@@ -33,6 +33,7 @@ class ContactSerializer(serializers.ModelSerializer):
 
 class LeadSerializer(serializers.ModelSerializer):
     contact = ContactSerializer(read_only=True)
+    converted_by = CustomUserSerializer(source='inquiry.responsible', read_only=True)
     participants = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=CustomUser.objects.all(),

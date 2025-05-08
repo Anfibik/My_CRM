@@ -15,6 +15,7 @@ from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, D
 from .permissions import IsDealAccess, NotCallOperator
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
     DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
+from .services import convert_inquiry
 
 
 class CompanyListCreateView(generics.ListCreateAPIView):
@@ -232,74 +233,24 @@ def convert_inquiry_view(request, pk):
     try:
         inquiry = Inquiry.objects.get(pk=pk)
 
-        # 1. Компания
-        raw_name = inquiry.company_name or "Без названия"
-        # Подготовка имени с кавычками
-        formatted_name = raw_name if raw_name.startswith('"') and raw_name.endswith('"') else f'"{raw_name}"'
-        # Ищем существующую компанию по quoted или raw имени, игнорируя регистр
-        company = Company.objects.filter(name__iexact=formatted_name).first()
-        if not company:
-            company = Company.objects.filter(name__iexact=raw_name).first()
-        if not company:
-            # Создаём новую, save() добавит кавычки
-            company = Company.objects.create(name=raw_name, site=inquiry.company_site)
+        # Если лид для этого обращения уже создан
+        try:
+            inquiry.lead
+            return Response({"detail": "Данное обращение уже конвертировано"}, status=status.HTTP_400_BAD_REQUEST)
+        except Lead.DoesNotExist:
+            pass
 
-        # 2. Контакт
-        contact, created = Contact.objects.get_or_create(
-            name=inquiry.full_name,
-            phone=inquiry.phone,
-            defaults={
-                'email': inquiry.email,
-                'messenger': inquiry.messenger,
-                'company': company
-            }
-        )
-        # По умолчанию сделать контакт главным для компании, если не задано
-        if not company.main_contact:
-            company.main_contact = contact
-            company.save(update_fields=['main_contact'])
-
-        # 3. Лид
-        lead_name = f"{contact.name} ({contact.company.name})"
+        # Используем конвертацию через сервис
         department_assignments = request.data.get("department_assignments", {})
-        lead, lead_created = Lead.objects.get_or_create(
-            name=lead_name,
-            need=inquiry.need_description,
-            department_assignments=department_assignments,
-            defaults={
-                'contact': contact,
-                'status': 'new'
-            }
-        )
-        # Добавляем оператора в участники лида, если лид новый
-        if lead_created:
-            lead.participants.add(request.user)
-
-        # 4. Сделки по направлениям
-        deals = []
-        if lead_created:
-            # Создаем сделки только для нового лида
-            for dept, user_id in department_assignments.items():
-                responsible = CustomUser.objects.filter(id=user_id).first()
-                deal = Deal.objects.create(
-                    lead=lead,
-                    department=dept,
-                    responsible=responsible,
-                    status="need"
-                )
-                deals.append(deal.id)
-
-        # Обновить статус обращения
-        inquiry.status = "in_progress"
-        inquiry.save()
-
+        lead = convert_inquiry(inquiry, department_assignments)
+        contact = lead.contact
+        deals = list(lead.deals.values_list('id', flat=True))
         return Response({
             "detail": "Обращение успешно конвертировано",
             "contact_id": contact.id,
-            "company_id": company.id,
+            "company_id": contact.company.id if contact.company else None,
             "lead_id": lead.id,
             "deal_ids": deals
         }, status=status.HTTP_200_OK)
-
     except Exception as e:
         return Response({"detail": f"Ошибка при конвертации: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
