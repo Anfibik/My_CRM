@@ -47,10 +47,14 @@ class LeadAdmin(admin.ModelAdmin):
 
 @admin.register(Deal)
 class DealAdmin(admin.ModelAdmin):
-    list_display = ("name", "lead", "responsible", "department", "contract_amount", "status")
+    list_display = ("name", "lead", "responsible", "department_verbose", "contract_amount", "status")
     search_fields = ("name", "lead__company__name")
     list_filter = ("status",)
     list_editable = ("contract_amount",)
+
+    def department_verbose(self, obj):
+        return obj.get_department_display()
+    department_verbose.short_description = "Департамент"
 
 
 @admin.register(Inquiry)

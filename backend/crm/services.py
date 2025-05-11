@@ -1,4 +1,6 @@
-from .models import Inquiry, Contact, Company, Lead, Deal, CustomUser
+from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser
+from django.utils import timezone
+import datetime
 
 
 def convert_inquiry(inquiry: Inquiry, department_assignments=None):
@@ -9,13 +11,16 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     company = None
 
     if inquiry.company_name:
-        company, _ = Company.objects.get_or_create(
-            name=inquiry.company_name,
-            defaults={
-                "site": inquiry.company_site or "",
-                # Здесь можно добавить дополнительные поля, если нужно
-            }
-        )
+        # Проверяем наличие компании по имени raw и в кавычках, чтобы избежать дублирования
+        company = Company.objects.filter(name__iexact=inquiry.company_name).first()
+        if not company:
+            quoted = f'"{inquiry.company_name}"'
+            company = Company.objects.filter(name__iexact=quoted).first()
+        if not company:
+            company = Company.objects.create(
+                name=inquiry.company_name,
+                site=inquiry.company_site or ""
+            )
 
     # 2. Обработка Contact: ищем по телефону или email, если не нашли – создаем.
     contact = None
@@ -41,31 +46,48 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
             company=company
         )
 
+    # После создания/обновления контакта, назначаем его главным в компании
+    if company:
+        company.main_contact = contact
+        company.save()
+
     # 3. Создание лида
     lead = Lead.objects.create(
         contact=contact,
-        name=f"{contact} ({company})",
+        inquiry=inquiry,
         need=inquiry.need_description,
         department_assignments=department_assignments,
         status="new"
     )
 
     # 4. Создание Deal(ов) для каждого продукта
-    products_list = inquiry.departments if isinstance(inquiry.departments, list) else []
+    products_list = department_assignments.keys() if isinstance(department_assignments, dict) else []
     for department in products_list:
-        responsible_id = None
-        if department_assignments and department in department_assignments:
-            try:
-                responsible_id = department_assignments[department]
-            except CustomUser.DoesNotExist:
-                responsible_id = None
-
-        Deal.objects.create(
-            lead_id=lead.pk,
-            product=department,  # здесь можно переименовать поле в department, если нужно
+        responsible = None
+        user_id = department_assignments.get(department)
+        if user_id:
+            responsible = CustomUser.objects.filter(id=user_id).first()
+        deal = Deal.objects.create(
+            lead=lead,
+            department=department,
             validated_need="",
-            status="open",
-            responsible_id=responsible_id  # назначенный сотрудник
+            status="need",
+            responsible=responsible
+        )
+        # Создаем следующий шаг
+        next_step = NextStep.objects.create(
+            deal=deal,
+            description="Связаться с клиентом",
+            deadline=deal.created_at + datetime.timedelta(hours=2)
+        )
+        # Создаем событие по сделке
+        DealEvent.objects.create(
+            deal=deal,
+            pipeline=deal.status,
+            event_type="first_contact",
+            content=f"Переданно от колл-центра. {inquiry.need_description}",
+            next_step=next_step,
+            created_by=inquiry.responsible
         )
 
     # (Необязательно) Обновляем статус обращения, например, помечаем его как "закрыто"
@@ -73,4 +95,3 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     inquiry.save()
 
     return lead  # или можно вернуть все созданные объекты
-
