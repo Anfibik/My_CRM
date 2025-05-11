@@ -10,8 +10,6 @@ from django.db import IntegrityError
 from django.db.models import Q
 
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
-from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
-    DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
 from .permissions import IsDealAccess, NotCallOperator
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
     DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer

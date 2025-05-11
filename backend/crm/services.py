@@ -1,4 +1,6 @@
-from .models import Inquiry, Contact, Company, Lead, Deal, CustomUser
+from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser
+from django.utils import timezone
+import datetime
 
 
 def convert_inquiry(inquiry: Inquiry, department_assignments=None):
@@ -65,12 +67,27 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
         user_id = department_assignments.get(department)
         if user_id:
             responsible = CustomUser.objects.filter(id=user_id).first()
-        Deal.objects.create(
+        deal = Deal.objects.create(
             lead=lead,
             department=department,
             validated_need="",
             status="need",
             responsible=responsible
+        )
+        # Создаем следующий шаг
+        next_step = NextStep.objects.create(
+            deal=deal,
+            description="Связаться с клиентом",
+            deadline=deal.created_at + datetime.timedelta(hours=2)
+        )
+        # Создаем событие по сделке
+        DealEvent.objects.create(
+            deal=deal,
+            pipeline=deal.status,
+            event_type="first_contact",
+            content=f"Переданно от колл-центра. {inquiry.need_description}",
+            next_step=next_step,
+            created_by=inquiry.responsible
         )
 
     # (Необязательно) Обновляем статус обращения, например, помечаем его как "закрыто"

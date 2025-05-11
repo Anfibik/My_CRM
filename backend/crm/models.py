@@ -179,6 +179,7 @@ class Lead(models.Model):
 
 
 class Deal(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания сделки")
     lead = models.ForeignKey(
         Lead,
         on_delete=models.CASCADE,
@@ -309,6 +310,11 @@ class DealEvent(models.Model):
         on_delete=models.CASCADE,
         related_name="events",
         verbose_name="Сделка"
+    )
+    pipeline = models.CharField(
+        max_length=20,
+        choices=Deal._meta.get_field('status').choices,
+        verbose_name="Стадия сделки при событии"
     )
     event_type = models.CharField(
         max_length=50,

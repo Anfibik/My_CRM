@@ -82,7 +82,8 @@ class DealEventSerializer(serializers.ModelSerializer):
         return None
 
     def get_pipeline_display(self, obj):
-        return obj.deal.get_status_display()
+        # Возвращаем сохраненную при событии стадию сделки
+        return obj.get_pipeline_display()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -108,6 +109,7 @@ class NextStepSerializer(serializers.ModelSerializer):
 
 class DealSerializer(serializers.ModelSerializer):
     lead = LeadSerializer(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
     last_event = serializers.SerializerMethodField()
     last_next_step = serializers.SerializerMethodField()
     responsible = CustomUserSerializer(read_only=True)

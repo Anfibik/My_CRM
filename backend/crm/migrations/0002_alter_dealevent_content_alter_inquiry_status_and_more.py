@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='nextstep',
             name='description',
-            field=models.TextField(default='Связаться с клиентом', verbose_name='Описание следующего шага'),
+            field=models.TextField(verbose_name='Описание следующего шага'),
         ),
     ]
