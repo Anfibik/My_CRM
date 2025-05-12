@@ -91,7 +91,7 @@ const CentralWorkBar = ({
             </p>
           </div>
         </div>
-        <TasksArea />
+        <TasksArea deal={deal} />
       </main>
     </Box>
   );

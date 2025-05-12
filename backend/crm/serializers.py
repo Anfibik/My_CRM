@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
+from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
 from .models import ROLE_CHOICES, DEPARTMENT_CHOICES
 
 
@@ -181,3 +182,54 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         validated_data['username'] = validated_data.get('work_email')
         user = CustomUser.objects.create_user(**validated_data)
         return user
+
+
+class TaskAttachmentSerializer(serializers.ModelSerializer):
+    """Сериализатор для вложений к задачам"""
+    uploaded_by_details = CustomUserSerializer(source='uploaded_by', read_only=True)
+
+    class Meta:
+        model = TaskAttachment
+        fields = '__all__'
+
+
+class TaskDiscussionSerializer(serializers.ModelSerializer):
+    """Сериализатор для обсуждений задачи"""
+    author_details = CustomUserSerializer(source='author', read_only=True)
+
+    class Meta:
+        model = TaskDiscussion
+        fields = '__all__'
+
+
+class TaskChangeLogSerializer(serializers.ModelSerializer):
+    """Сериализатор для логов изменений задачи"""
+    user_details = CustomUserSerializer(source='user', read_only=True)
+
+    class Meta:
+        model = TaskChangeLog
+        fields = '__all__'
+
+
+class TaskSerializer(serializers.ModelSerializer):
+    """Сериализатор для задач"""
+    author_details = CustomUserSerializer(source='author', read_only=True)
+    executor_details = CustomUserSerializer(source='executor', read_only=True)
+    participants_details = CustomUserSerializer(source='participants', many=True, read_only=True)
+    observers_details = CustomUserSerializer(source='observers', many=True, read_only=True)
+    discussions = TaskDiscussionSerializer(many=True, read_only=True)
+    attachments = TaskAttachmentSerializer(many=True, read_only=True)
+    task_type_display = serializers.CharField(source='get_task_type_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = Task
+        fields = '__all__'
+        
+    def to_representation(self, instance):
+        """Расширяем представление для API - добавляем количество обсуждений и вложений"""
+        data = super().to_representation(instance)
+        data['discussions_count'] = instance.discussions.count()
+        data['attachments_count'] = instance.attachments.count()
+        return data

@@ -375,3 +375,179 @@ class NextStep(models.Model):
 
     def __str__(self):
         return f"Следующий шаг для сделки {self.deal.id}"
+
+
+class Task(models.Model):
+    """Модель задачи, привязанной к сделке"""
+    TASK_TYPE_CHOICES = [
+        ("approval", "Согласование"),
+        ("payment", "Оплата"),
+        ("delivery", "Доставка"),
+        ("universal", "Универсальная"),
+    ]
+    
+    PRIORITY_CHOICES = [
+        ("low", "Низкий"),
+        ("medium", "Средний"),
+        ("high", "Высокий"),
+    ]
+    
+    STATUS_CHOICES = [
+        ("not_accepted", "Не принята"),
+        ("pending", "В ожидании"),
+        ("accepted", "Принята"),
+        ("in_progress", "В работе"),
+        ("completed", "Выполнена"),
+        ("closed", "Закрыта"),
+    ]
+    
+    # Основные поля
+    title = models.CharField(max_length=255, verbose_name="Заголовок задачи")
+    description = models.TextField(verbose_name="Описание задачи")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
+    deadline = models.DateTimeField(null=True, blank=True, verbose_name="Дедлайн")
+    closed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата закрытия")
+    
+    # Категоризация
+    task_type = models.CharField(
+        max_length=20,
+        choices=TASK_TYPE_CHOICES,
+        default="universal",
+        verbose_name="Тип задачи"
+    )
+    priority = models.CharField(
+        max_length=20,
+        choices=PRIORITY_CHOICES,
+        default="medium",
+        verbose_name="Приоритет"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="not_accepted",
+        verbose_name="Статус"
+    )
+    
+    # Связи
+    deal = models.ForeignKey(
+        Deal,
+        on_delete=models.CASCADE,
+        related_name="tasks",
+        verbose_name="Сделка"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_tasks",
+        verbose_name="Автор"
+    )
+    executor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_tasks",
+        verbose_name="Исполнитель"
+    )
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="participating_tasks",
+        blank=True,
+        verbose_name="Участники"
+    )
+    observers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="observing_tasks",
+        blank=True,
+        verbose_name="Наблюдатели"
+    )
+    
+    def __str__(self):
+        return self.title
+
+
+class TaskDiscussion(models.Model):
+    """Модель для обсуждений (чат) задачи"""
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="discussions",
+        verbose_name="Задача"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="task_messages",
+        verbose_name="Автор"
+    )
+    content = models.TextField(verbose_name="Содержание сообщения")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    is_system = models.BooleanField(default=False, verbose_name="Системное сообщение")
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Обсуждение задачи"
+        verbose_name_plural = "Обсуждения задач"
+    
+    def __str__(self):
+        return f"Сообщение в задаче {self.task.title} от {self.author}"
+
+
+class TaskChangeLog(models.Model):
+    """Модель для логирования изменений в задаче"""
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="change_logs",
+        verbose_name="Задача"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="task_changes",
+        verbose_name="Пользователь"
+    )
+    field_name = models.CharField(max_length=100, verbose_name="Изменённое поле")
+    old_value = models.TextField(blank=True, null=True, verbose_name="Старое значение")
+    new_value = models.TextField(blank=True, null=True, verbose_name="Новое значение")
+    change_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата изменения")
+    
+    class Meta:
+        ordering = ['-change_date']
+        verbose_name = "Лог изменений задачи"
+        verbose_name_plural = "Логи изменений задач"
+    
+    def __str__(self):
+        return f"Изменение в задаче {self.task.title}: {self.field_name}"
+
+
+class TaskAttachment(models.Model):
+    """Модель для прикрепления файлов к задаче"""
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        verbose_name="Задача"
+    )
+    file = models.FileField(upload_to='task_attachments/', verbose_name="Файл")
+    filename = models.CharField(max_length=255, verbose_name="Имя файла")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="task_attachments",
+        verbose_name="Загрузил"
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+        verbose_name = "Вложение к задаче"
+        verbose_name_plural = "Вложения к задачам"
+    
+    def __str__(self):
+        return self.filename

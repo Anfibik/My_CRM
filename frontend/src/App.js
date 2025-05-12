@@ -11,6 +11,7 @@ import LeadListPage from './pages/LeadListPage';
 import DealListPage from './pages/DealListPage';
 import InquiryListPage from './pages/InquiryListPage';
 import DealDetailPage from './pages/DealDetailPage';
+import TaskDetailPage from './pages/TaskDetailPage';
 import UserAuthModal from './components/UserAuthModal';
 
 const AppContent = () => {
@@ -114,6 +115,14 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <DealDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks/:id"
+            element={
+              <ProtectedRoute>
+                <TaskDetailPage />
               </ProtectedRoute>
             }
           />

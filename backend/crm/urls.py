@@ -6,7 +6,9 @@ from .views import (
     CompanyDetailView, ContactDetailView,
     convert_inquiry_view, DealEventListCreateView, DealEventDetailView,
     NextStepListCreateView, NextStepDetailView,
-    UserRegistrationView, UserLoginView, UserProfileView, UserViewSet
+    UserRegistrationView, UserLoginView, UserProfileView, UserViewSet,
+    # Новые представления для задач
+    TaskViewSet, TaskDiscussionViewSet, TaskAttachmentViewSet, TaskChangeLogViewSet
 )
 
 
@@ -15,6 +17,12 @@ router.register(r'deals', DealViewSet, basename='deal')
 router.register(r'leads', LeadViewSet, basename='lead')
 router.register(r'inquiries', InquiryViewSet, basename='inquiry')
 router.register(r'users', UserViewSet, basename='user')
+
+# Регистрация маршрутов для задач и связанных сущностей
+router.register(r'tasks', TaskViewSet, basename='task')
+router.register(r'task-discussions', TaskDiscussionViewSet, basename='task-discussion')
+router.register(r'task-attachments', TaskAttachmentViewSet, basename='task-attachment')
+router.register(r'task-changelogs', TaskChangeLogViewSet, basename='task-changelog')
 
 
 urlpatterns = [

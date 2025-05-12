@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, CustomUser
+from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
 from django import forms
 
 
@@ -77,3 +78,64 @@ class CustomUser(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.filter(is_superuser=False)
+
+
+@admin.register(Task)
+class TaskAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'deal', 'author', 'executor', 'created_at', 'deadline', 'task_type', 'priority', 'status')
+    list_filter = ('status', 'priority', 'task_type', 'created_at')
+    search_fields = ('title', 'description', 'author__username', 'executor__username')
+    date_hierarchy = 'created_at'
+    list_editable = ('status', 'priority')
+    filter_horizontal = ('participants', 'observers')
+    readonly_fields = ('created_at',)
+    fieldsets = (
+        ('Основная информация', {
+            'fields': ('title', 'description', 'deal', 'author', 'created_at')
+        }),
+        ('Назначения', {
+            'fields': ('executor', 'participants', 'observers')
+        }),
+        ('Параметры', {
+            'fields': ('task_type', 'priority', 'status', 'deadline')
+        }),
+    )
+
+
+@admin.register(TaskDiscussion)
+class TaskDiscussionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'task', 'author', 'created_at', 'is_system', 'content_preview')
+    list_filter = ('created_at', 'is_system')
+    search_fields = ('content', 'author__username', 'task__title')
+    date_hierarchy = 'created_at'
+    readonly_fields = ('created_at',)
+    
+    def content_preview(self, obj):
+        return obj.content[:50] + '...' if len(obj.content) > 50 else obj.content
+    content_preview.short_description = 'Содержание'
+
+
+@admin.register(TaskChangeLog)
+class TaskChangeLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'task', 'user', 'change_date', 'field_name', 'old_value_preview', 'new_value_preview')
+    list_filter = ('change_date', 'field_name')
+    search_fields = ('task__title', 'user__username', 'field_name')
+    date_hierarchy = 'change_date'
+    readonly_fields = ('task', 'user', 'change_date', 'field_name', 'old_value', 'new_value')
+    
+    def old_value_preview(self, obj):
+        return obj.old_value[:30] + '...' if len(obj.old_value) > 30 else obj.old_value
+    old_value_preview.short_description = 'Старое значение'
+    
+    def new_value_preview(self, obj):
+        return obj.new_value[:30] + '...' if len(obj.new_value) > 30 else obj.new_value
+    new_value_preview.short_description = 'Новое значение'
+
+
+@admin.register(TaskAttachment)
+class TaskAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'task', 'filename', 'uploaded_by', 'uploaded_at')
+    list_filter = ('uploaded_at',)
+    search_fields = ('filename', 'task__title', 'uploaded_by__username')
+    date_hierarchy = 'uploaded_at'
+    readonly_fields = ('uploaded_at',)

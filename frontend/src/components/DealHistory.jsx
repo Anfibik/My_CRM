@@ -29,7 +29,7 @@ const DealHistory = ({ dealEvents, deal }) => {
           sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, borderBottom: '1px solid #ccc' }}
         >
           {/* Левая часть */}
-          <Box sx={{ flex: 1, pr: 2 }}>
+          <Box sx={{ flex: '60%', pr: 2 }}>
             <Typography variant="caption" color="text.disabled">
               [{`${new Date(ev.created_at).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric'})} - ${new Date(ev.created_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`}] {ev.pipeline_display} - {ev.event_type_display || ev.event_type}:
             </Typography>
@@ -38,7 +38,7 @@ const DealHistory = ({ dealEvents, deal }) => {
             </Typography>
           </Box>
           {/* Правая часть */}
-          <Box sx={{ flex: 1, pl: 2 }}>
+          <Box sx={{ flex: '40%', pl: 2 }}>
             <Typography variant="caption" color="text.disabled">
               [{ev.next_step_details?.deadline
                 ? `${new Date(ev.next_step_details.deadline).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric'})} - ${new Date(ev.next_step_details.deadline).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}`

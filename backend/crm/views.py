@@ -8,11 +8,14 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from django.db import IntegrityError
 from django.db.models import Q
+from django.utils import timezone
 
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
+from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
 from .permissions import IsDealAccess, NotCallOperator
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
     DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
+from .serializers import TaskSerializer, TaskDiscussionSerializer, TaskChangeLogSerializer, TaskAttachmentSerializer
 from .services import convert_inquiry
 
 
@@ -219,6 +222,183 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         department = self.request.query_params.get('department')
         if department:
             queryset = queryset.filter(department=department)
+        return queryset
+
+
+# ----- Задачи и связанные сущности -----
+
+class TaskViewSet(viewsets.ModelViewSet):
+    """
+API для управления задачами. Поддерживает CRUD-операции.  
+    
+    list:  
+        Возвращает список задач с возможностью фильтрации.  
+        Параметры запроса:  
+        - deal: ID сделки (для фильтрации задач по сделке)  
+        - status: статус задачи (not_accepted, pending, accepted, in_progress, completed, closed)  
+        - priority: приоритет задачи (low, medium, high)  
+        - task_type: тип задачи (approval, payment, delivery, universal)  
+    """
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        
+        # Фильтр по сделке
+        deal_id = self.request.query_params.get('deal')
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+            
+        # Фильтр по статусу
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+            
+        # Фильтр по приоритету
+        priority = self.request.query_params.get('priority')
+        if priority:
+            queryset = queryset.filter(priority=priority)
+            
+        # Фильтр по типу задачи
+        task_type = self.request.query_params.get('task_type')
+        if task_type:
+            queryset = queryset.filter(task_type=task_type)
+        
+        # Для владельцев и топ-менеджеров отображаем все задачи
+        if user.role in ('owner', 'top_manager'):
+            return queryset.order_by('-created_at')
+            
+        # Остальные пользователи видят только задачи, в которых они участвуют
+        return queryset.filter(
+            Q(author=user) | Q(executor=user) | Q(participants=user) | Q(observers=user)
+        ).distinct().order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        # Автоматически устанавливаем текущего пользователя как автора
+        serializer.save(author=self.request.user)
+        
+    def perform_update(self, serializer):
+        # Фиксируем изменения в TaskChangeLog
+        old_instance = Task.objects.get(pk=serializer.instance.pk)
+        instance = serializer.save()
+        
+        # Проверяем изменения в основных полях
+        changed_fields = []
+        for field_name in ['title', 'description', 'status', 'priority', 'task_type', 'executor']:
+            old_value = getattr(old_instance, field_name)
+            new_value = getattr(instance, field_name)
+            
+            if old_value != new_value:
+                # Создаем запись в логе изменений
+                TaskChangeLog.objects.create(
+                    task=instance,
+                    user=self.request.user,
+                    field_name=field_name,
+                    old_value=str(old_value) if old_value is not None else '',
+                    new_value=str(new_value) if new_value is not None else ''
+                )
+                changed_fields.append(field_name)
+                
+                # Если статус изменился на 'закрыта', фиксируем дату закрытия
+                if field_name == 'status' and new_value == 'closed' and old_value != 'closed':
+                    instance.closed_at = timezone.now()
+                    instance.save()
+                    
+        # Если произошли изменения, создаем системное сообщение в обсуждении
+        if changed_fields:
+            changes_text = ', '.join([f'{field}' for field in changed_fields])
+            # Создаем системное сообщение в обсуждении
+            TaskDiscussion.objects.create(
+                task=instance,
+                author=self.request.user,
+                content=f'Изменены поля: {changes_text}',
+                is_system=True
+            )
+
+
+class TaskDiscussionViewSet(viewsets.ModelViewSet):
+    """
+    API для управления обсуждениями задач.  
+    
+    list:  
+        Возвращает список сообщений для конкретной задачи.  
+        Параметры запроса:  
+        - task: ID задачи (обязательный параметр)  
+    """
+    queryset = TaskDiscussion.objects.all()
+    serializer_class = TaskDiscussionSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset().order_by('created_at')
+        # Фильтрация по задаче (обязательный параметр)
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        else:
+            # Если задача не указана, возвращаем пустой QuerySet
+            queryset = queryset.none()
+        return queryset
+    
+    def perform_create(self, serializer):
+        # Автоматически устанавливаем текущего пользователя как автора сообщения
+        serializer.save(author=self.request.user, is_system=False)
+
+
+class TaskAttachmentViewSet(viewsets.ModelViewSet):
+    """
+    API для управления вложениями к задачам.  
+    
+    list:  
+        Возвращает список вложений для конкретной задачи.  
+        Параметры запроса:  
+        - task: ID задачи (обязательный параметр)  
+    """
+    queryset = TaskAttachment.objects.all()
+    serializer_class = TaskAttachmentSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Фильтрация по задаче
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        else:
+            # Если задача не указана, возвращаем пустой QuerySet
+            queryset = queryset.none()
+        return queryset
+    
+    def perform_create(self, serializer):
+        # Автоматически устанавливаем текущего пользователя как автора вложения
+        serializer.save(uploaded_by=self.request.user)
+
+
+class TaskChangeLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API для просмотра истории изменений задачи (только чтение).  
+    
+    list:  
+        Возвращает историю изменений конкретной задачи.  
+        Параметры запроса:  
+        - task: ID задачи (обязательный параметр)  
+    """
+    queryset = TaskChangeLog.objects.all()
+    serializer_class = TaskChangeLogSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset().order_by('-change_date')
+        # Фильтрация по задаче
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        else:
+            # Если задача не указана, возвращаем пустой QuerySet
+            queryset = queryset.none()
         return queryset
 
 
