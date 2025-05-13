@@ -32,22 +32,31 @@ const DealListPage = () => {
     try {
       const response = await api.get('/api/deals/');
       const rawDeals = Array.isArray(response.data) ? response.data : response.data.results || [];
-      const dealsWithDepth = await Promise.all(
+      const dealsWithDepthAndTasks = await Promise.all(
         rawDeals.map(async (deal) => {
           try {
+            // Получаем события для подсчета глубины
             const eventsRes = await api.get(`/api/deal-events/?deal=${deal.id}`);
             const events = Array.isArray(eventsRes.data)
               ? eventsRes.data
               : eventsRes.data.results || [];
             const depthCount = events.filter(ev => ev.next_step_details).length;
-            return { ...deal, depth: depthCount };
+            
+            // Получаем задачи для данной сделки
+            const tasksRes = await api.get(`/api/tasks/?deal=${deal.id}`);
+            const tasks = Array.isArray(tasksRes.data)
+              ? tasksRes.data
+              : tasksRes.data.results || [];
+            const tasksCount = tasks.length;
+            
+            return { ...deal, depth: depthCount, tasksCount: tasksCount };
           } catch (err) {
-            console.error(`Ошибка при получении событий для сделки ${deal.id}:`, err);
-            return { ...deal, depth: 0 };
+            console.error(`Ошибка при получении данных для сделки ${deal.id}:`, err);
+            return { ...deal, depth: 0, tasksCount: 0 };
           }
         })
       );
-      setDeals(dealsWithDepth);
+      setDeals(dealsWithDepthAndTasks);
     } catch (error) {
       console.error("Ошибка при получении сделок:", error);
     } finally {
@@ -96,6 +105,7 @@ const DealListPage = () => {
               <th className="py-3 px-6 text-left">Ответственный</th>
               <th className="py-3 px-6 text-left">Статус</th>
               <th className="py-3 px-6 text-center">Глубина</th>
+              <th className="py-3 px-6 text-center">Задачи</th>
             </tr>
           </thead>
           <tbody className="text-gray-600 text-sm font-light">
@@ -113,6 +123,13 @@ const DealListPage = () => {
                 <td className={`py-1 px-3 text-left ${deal.status === 'need' ? 'text-red-500 font-semibold' : ''}`}>{statusLabels[deal.status] || deal.status}</td>
                 <td className="py-1 px-3 text-center">
                   {deal.depth ?? 0}
+                </td>
+                <td className="py-1 px-3 text-center">
+                  <div className="flex justify-center items-center">
+                    <span className={`${deal.tasksCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-0.5 rounded-full text-xs font-medium`}>
+                      {deal.tasksCount ?? 0}
+                    </span>
+                  </div>
                 </td>
               </tr>
             ))}
