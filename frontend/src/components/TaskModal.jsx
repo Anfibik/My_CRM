@@ -7,11 +7,14 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
     title: '',
     task_type: 'universal',
     priority: 'medium',
-    deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16), // Завтра по умолчанию, формат для input type='datetime-local'
+    deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16), // Завтра по умолчанию
     executor: '',
     participants: [],
     observers: []
   });
+  
+  // Состояние для выбранного варианта дедлайна в выпадающем меню
+  const [deadlineOption, setDeadlineOption] = useState('tomorrow');
 
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [description, setDescription] = useState('');
@@ -21,6 +24,62 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
     setTaskData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Функция для обработки выбора варианта дедлайна из выпадающего меню
+  const handleDeadlineOptionChange = (e) => {
+    const option = e.target.value;
+    setDeadlineOption(option);
+    
+    // Расчёт нового дедлайна в зависимости от выбранной опции
+    let newDeadline = new Date();
+    
+    switch(option) {
+      case 'twoHours':
+        // Текущее время + 2 часа
+        newDeadline.setHours(newDeadline.getHours() + 2);
+        break;
+        
+      case 'today':
+        // Сегодня до 17:30
+        newDeadline.setHours(17, 30, 0, 0);
+        break;
+        
+      case 'tomorrow':
+        // Завтра до 17:30
+        newDeadline.setDate(newDeadline.getDate() + 1);
+        newDeadline.setHours(17, 30, 0, 0);
+        break;
+        
+      case 'thisWeek':
+        // До пятницы этой недели до 17:00
+        const dayOfWeek = newDeadline.getDay(); // 0 (вс) - 6 (сб)
+        const daysUntilFriday = dayOfWeek >= 5 ? 5 + 7 - dayOfWeek : 5 - dayOfWeek;
+        newDeadline.setDate(newDeadline.getDate() + daysUntilFriday);
+        newDeadline.setHours(17, 0, 0, 0);
+        break;
+        
+      case 'manual':
+        // При выборе ручного режима не меняем дедлайн
+        return;
+    }
+    
+    // Корректно форматируем дату и время для ввода в HTML5 input datetime-local
+    // с учетом местного часового пояса
+    const year = newDeadline.getFullYear();
+    const month = String(newDeadline.getMonth() + 1).padStart(2, '0');
+    const day = String(newDeadline.getDate()).padStart(2, '0');
+    const hours = String(newDeadline.getHours()).padStart(2, '0');
+    const minutes = String(newDeadline.getMinutes()).padStart(2, '0');
+    
+    const formattedDeadline = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    // Обновляем дедлайн в состоянии
+    setTaskData(prev => ({ 
+      ...prev, 
+      deadline: formattedDeadline
+    }));
+  };
+  
+  // Функция для прямого изменения даты (при ручном выборе)
   const handleDeadlineChange = (e) => {
     setTaskData(prev => ({ ...prev, deadline: e.target.value }));
   };
@@ -36,15 +95,30 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
   };
 
   const resetForm = () => {
+    // Создаем дату на завтра в 17:30
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(17, 30, 0, 0);
+    
+    // Форматируем дату для input datetime-local
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const hours = String(tomorrow.getHours()).padStart(2, '0');
+    const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
+    
+    const defaultDeadline = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
     setTaskData({
       title: '',
       task_type: 'universal',
       priority: 'medium',
-      deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      deadline: defaultDeadline,
       executor: '',
       participants: [],
       observers: []
     });
+    setDeadlineOption('tomorrow'); // Сбрасываем также выбранную опцию дедлайна
     setDescription('');
     setDescriptionOpen(false);
   };
@@ -99,17 +173,37 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
               </Select>
             </FormControl>
 
-            <TextField
-              label="Дедлайн"
-              type="datetime-local"
-              name="deadline"
-              value={taskData.deadline}
-              onChange={handleDeadlineChange}
-              fullWidth
-              InputLabelProps={{
-                shrink: true,
-              }}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Дедлайн</InputLabel>
+              <Select
+                name="deadlineOption"
+                value={deadlineOption}
+                onChange={handleDeadlineOptionChange}
+                label="Дедлайн"
+              >
+                <MenuItem value="twoHours">2 часа (текущее время + 2ч)</MenuItem>
+                <MenuItem value="today">Сегодня (до 17:30)</MenuItem>
+                <MenuItem value="tomorrow">Завтра (до 17:30)</MenuItem>
+                <MenuItem value="thisWeek">Эта неделя (до пятницы 17:00)</MenuItem>
+                <MenuItem value="manual">В ручную (выбрать дату и время)</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {/* Показываем календарь только если выбрана опция "В ручную" */}
+            {deadlineOption === 'manual' && (
+              <TextField
+                label="Выберите дату и время"
+                type="datetime-local"
+                name="deadline"
+                value={taskData.deadline}
+                onChange={handleDeadlineChange}
+                fullWidth
+                sx={{ mt: 2 }}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            )}
 
             <FormControl fullWidth error={!users || users.length === 0}>
               <InputLabel>Исполнитель *</InputLabel>

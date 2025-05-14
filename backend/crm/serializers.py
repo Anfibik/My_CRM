@@ -5,9 +5,14 @@ from .models import ROLE_CHOICES, DEPARTMENT_CHOICES
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
+    is_admin = serializers.SerializerMethodField()
+    
+    def get_is_admin(self, obj):
+        return obj.username == 'admin' and obj.is_superuser
+    
     class Meta:
         model = CustomUser
-        fields = ['id', 'full_name', 'department', 'role']
+        fields = ['id', 'full_name', 'department', 'role', 'is_admin']
 
 
 class ContactShortSerializer(serializers.ModelSerializer):
@@ -222,6 +227,7 @@ class TaskSerializer(serializers.ModelSerializer):
     task_type_display = serializers.CharField(source='get_task_type_display', read_only=True)
     priority_display = serializers.CharField(source='get_priority_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    deal_details = DealSerializer(source='deal', read_only=True)
     
     class Meta:
         model = Task

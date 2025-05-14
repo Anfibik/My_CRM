@@ -19,7 +19,6 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import WarningIcon from '@mui/icons-material/Warning';
-import CancelIcon from '@mui/icons-material/Cancel';
 
 // Настройка axios для авторизации
 axios.defaults.withCredentials = true;
@@ -225,36 +224,6 @@ const TaskDetail = () => {
     }
   };
 
-  // Функция для удаления участника напрямую из детали задачи
-  const removeParticipant = async (userId) => {
-    try {
-      const newParticipants = (task.participants || []).filter(id => id !== userId);
-      const response = await axios.patch(`/api/tasks/${id}/`, { participants: newParticipants }, { withCredentials: true });
-      setTask(prev => ({
-        ...prev,
-        participants: response.data.participants,
-        participants_details: response.data.participants_details || (prev.participants_details || []).filter(u => u.id !== userId)
-      }));
-    } catch (err) {
-      console.error('Ошибка при удалении участника:', err);
-    }
-  };
-
-  // Функция для удаления наблюдателя напрямую
-  const removeObserver = async (userId) => {
-    try {
-      const newObservers = (task.observers || []).filter(id => id !== userId);
-      const response = await axios.patch(`/api/tasks/${id}/`, { observers: newObservers }, { withCredentials: true });
-      setTask(prev => ({
-        ...prev,
-        observers: response.data.observers,
-        observers_details: response.data.observers_details || (prev.observers_details || []).filter(u => u.id !== userId)
-      }));
-    } catch (err) {
-      console.error('Ошибка при удалении наблюдателя:', err);
-    }
-  };
-
   // Хелперы для отображения
   const formatDateTime = (dateString) => {
     if (!dateString) return '—';
@@ -400,37 +369,6 @@ const TaskDetail = () => {
     };
     
     return departments[departmentCode] || departmentCode;
-  };
-
-  const getRoleLabel = (roleCode) => {
-    if (!roleCode) return '';
-    const roleMap = {
-      'owner': 'Собственник',
-      'sales_manager': 'Менеджер по продажам',
-      'project_manager': 'Проектный менеджер',
-      'account_manager': 'Аккаунт менеджер',
-      'logistic': 'Логист',
-      'engineer': 'Инженер',
-      'warehouse_worker': 'Кладовщик',
-      'accountant': 'Бухгалтер',
-      'lawyer': 'Юрист',
-      'top_manager': 'ТОП Менеджер',
-      'call_operator': 'Оператор кол-центра',
-      'admin': 'Администратор',
-      'manager': 'Менеджер',
-      'sales': 'Продажи'
-    };
-    return roleMap[roleCode] || roleCode;
-  };
-
-  // Функция для фильтрации доступных пользователей
-  const filterAvailableUsers = (users) => {
-    return users.filter(user => {
-      const isAuthor = task.author_details && user.id === task.author_details.id;
-      const isExecutor = task.executor_details && user.id === task.executor_details.id;
-      const isAdmin = user.is_admin; // Исключаем администратора Django
-      return !isAuthor && !isExecutor && !isAdmin;
-    });
   };
 
   // Если данные загружаются, показываем индикатор загрузки
@@ -789,8 +727,9 @@ const TaskDetail = () => {
                       display: 'block',
                       fontSize: '0.85rem'
                     }}
+                    title={`${task.deal_details?.lead?.contact?.name} ("ФОП ${task.deal_details?.lead?.contact?.company?.name}") (${getDepartmentLabel(task.deal_details?.department)})`}
                   >
-                    {task.deal_details?.name} 
+                    {task.deal_details?.lead?.contact?.name} ("ФОП {task.deal_details?.lead?.contact?.company?.name}") ({getDepartmentLabel(task.deal_details?.department)})
                   </Box>
                 ) : (
                   'Не указана'
@@ -914,6 +853,9 @@ const TaskDetail = () => {
                   >
                     Участники:
                   </Box>
+                  <Box component="span" sx={{ color: 'text.primary', fontSize: '0.9rem' }}>
+                    {task.participants_details.length} чел.
+                  </Box>
                 </>
               ) : (
                 // Если участники не добавлены
@@ -939,6 +881,9 @@ const TaskDetail = () => {
                   >
                     Участники
                   </Box>
+                  <Box component="span" sx={{ color: 'text.secondary', fontSize: '0.9rem', ml: 1, fontStyle: 'italic' }}>
+                    не добавлены
+                  </Box>
                 </>
               )}
             </Box>
@@ -947,20 +892,33 @@ const TaskDetail = () => {
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', p: '1px', mb: 2, ml: 2 }}>
               {task.participants_details && task.participants_details.length > 0 ? (
                 task.participants_details.map(participant => (
-                  <Tooltip
+                  <Chip
                     key={participant.id}
-                    title={`${getRoleLabel(participant.role) || ''}${participant.role && participant.department ? ' / ' : ''}${getDepartmentLabel(participant.department) || ''}`}
-                    arrow
-                    enterDelay={1000}
-                  >
-                    <Chip
-                      label={participant.full_name}
-                      size="small"
-                      deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
-                      onDelete={(e) => { e.stopPropagation(); removeParticipant(participant.id); }}
-                      sx={{ bgcolor: 'grey.300', color: 'grey.800', fontSize: '0.65rem', height: 24 }}
-                    />
-                  </Tooltip>
+                    label={participant.full_name}
+                    size="small"
+                    sx={{ backgroundColor: 'grey.200', color: 'text.secondary', fontSize: '0.75rem' }}
+                    title={(() => {
+                      // Преобразование роли в человекочитаемый вид
+                      const roleMap = {
+                        'owner': 'Собственник',
+                        'sales_manager': 'Менеджер по продажам',
+                        'project_manager': 'Проектный менеджер',
+                        'account_manager': 'Аккаунт менеджер',
+                        'logistic': 'Логист',
+                        'engineer': 'Инженер',
+                        'warehouse_worker': 'Кладовщик',
+                        'accountant': 'Бухгалтер',
+                        'lawyer': 'Юрист',
+                        'top_manager': 'ТОП Менеджер',
+                        'call_operator': 'Оператор кол-центра',
+                        'admin': 'Администратор',
+                        'manager': 'Менеджер',
+                        'sales': 'Продажи'
+                      };
+                      const role = roleMap[participant.role] || participant.role || 'Не указана';
+                      return `${role} / ${getDepartmentLabel(participant.department)}`;
+                    })()}
+                  />
                 ))
               ) : null}
             </Box>
@@ -983,6 +941,9 @@ const TaskDetail = () => {
                     }}
                   >
                     Наблюдатели:
+                  </Box>
+                  <Box component="span" sx={{ color: 'text.primary', fontSize: '0.9rem' }}>
+                    {task.observers_details.length} чел.
                   </Box>
                 </>
               ) : (
@@ -1009,6 +970,9 @@ const TaskDetail = () => {
                   >
                     Наблюдатели
                   </Box>
+                  <Box component="span" sx={{ color: 'text.secondary', fontSize: '0.9rem', ml: 1, fontStyle: 'italic' }}>
+                    не добавлены
+                  </Box>
                 </>
               )}
             </Box>
@@ -1017,25 +981,33 @@ const TaskDetail = () => {
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', p: '1px', mb: 2, ml: 2 }}>
               {task.observers_details && task.observers_details.length > 0 ? (
                 task.observers_details.map(observer => (
-                  <Tooltip
+                  <Chip
                     key={observer.id}
-                    title={`${getRoleLabel(observer.role) || ''}${observer.role && observer.department ? ' / ' : ''}${getDepartmentLabel(observer.department) || ''}`}
-                    arrow
-                    enterDelay={300}
-                  >
-                    <Chip
-                      label={observer.full_name} // Используем full_name
-                      size="small"
-                      deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
-                      onDelete={(e) => { e.stopPropagation(); removeObserver(observer.id); }}
-                      sx={{ 
-                        bgcolor: 'grey.300',
-                        color: 'grey.800',
-                        fontSize: '0.65rem', 
-                        height: 24
-                      }}
-                    />
-                  </Tooltip>
+                    label={observer.full_name}
+                    size="small"
+                    sx={{ backgroundColor: 'grey.200', color: 'text.secondary', fontSize: '0.75rem' }}
+                    title={(() => {
+                      // Преобразование роли в человекочитаемый вид
+                      const roleMap = {
+                        'owner': 'Собственник',
+                        'sales_manager': 'Менеджер по продажам',
+                        'project_manager': 'Проектный менеджер',
+                        'account_manager': 'Аккаунт менеджер',
+                        'logistic': 'Логист',
+                        'engineer': 'Инженер',
+                        'warehouse_worker': 'Кладовщик',
+                        'accountant': 'Бухгалтер',
+                        'lawyer': 'Юрист',
+                        'top_manager': 'ТОП Менеджер',
+                        'call_operator': 'Оператор кол-центра',
+                        'admin': 'Администратор',
+                        'manager': 'Менеджер',
+                        'sales': 'Продажи'
+                      };
+                      const role = roleMap[observer.role] || observer.role || 'Не указана';
+                      return `${role} / ${getDepartmentLabel(observer.department)}`;
+                    })()}
+                  />
                 ))
               ) : null}
             </Box>
@@ -1139,8 +1111,7 @@ const TaskDetail = () => {
                   filter(user => {
                     const isAuthor = task.author_details && user.id === task.author_details.id;
                     const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
+                    return !isAuthor && !isExecutor;
                   }).
                   map(user => (
                     <Box 
@@ -1160,7 +1131,7 @@ const TaskDetail = () => {
                       onClick={() => {
                         // Если пользователь уже выбран, удаляем его из списка, иначе добавляем
                         if (selectedParticipants.includes(user.id)) {
-                          setSelectedParticipants(prev => prev.filter(id => String(id) !== String(user.id)));
+                          setSelectedParticipants(prev => prev.filter(id => id !== user.id));
                         } else {
                           setSelectedParticipants(prev => [...prev, user.id]);
                         }
@@ -1205,8 +1176,7 @@ const TaskDetail = () => {
                 {availableUsers.filter(user => {
                     const isAuthor = task.author_details && user.id === task.author_details.id;
                     const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
+                    return !isAuthor && !isExecutor;
                   }).length === 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ p: 1, fontStyle: 'italic' }}>
                       Нет доступных пользователей
@@ -1228,9 +1198,8 @@ const TaskDetail = () => {
                     <Chip
                       key={user.id}
                       label={user.full_name}
-                      deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
-                      onDelete={(e) => { e.stopPropagation(); setSelectedParticipants(prev => prev.filter(id => String(id) !== String(user.id))); }}
-                      sx={{ bgcolor: 'grey.300', color: 'grey.800', fontSize: '0.65rem', height: 24 }}
+                      onDelete={() => setSelectedParticipants(prev => prev.filter(id => id !== user.id))}
+                      sx={{ bgcolor: 'primary.light', color: 'white' }}
                     />
                   ))
                 }
@@ -1276,8 +1245,7 @@ const TaskDetail = () => {
                   filter(user => {
                     const isAuthor = task.author_details && user.id === task.author_details.id;
                     const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
+                    return !isAuthor && !isExecutor;
                   }).
                   map(user => (
                     <Box 
@@ -1297,7 +1265,7 @@ const TaskDetail = () => {
                       onClick={() => {
                         // Если пользователь уже выбран, удаляем его из списка, иначе добавляем
                         if (selectedObservers.includes(user.id)) {
-                          setSelectedObservers(prev => prev.filter(id => String(id) !== String(user.id)));
+                          setSelectedObservers(prev => prev.filter(id => id !== user.id));
                         } else {
                           setSelectedObservers(prev => [...prev, user.id]);
                         }
@@ -1342,8 +1310,7 @@ const TaskDetail = () => {
                 {availableUsers.filter(user => {
                     const isAuthor = task.author_details && user.id === task.author_details.id;
                     const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
+                    return !isAuthor && !isExecutor;
                   }).length === 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ p: 1, fontStyle: 'italic' }}>
                       Нет доступных пользователей
@@ -1365,8 +1332,8 @@ const TaskDetail = () => {
                     <Chip
                       key={user.id}
                       label={user.full_name}
-                      onDelete={(e) => { e.stopPropagation(); setSelectedObservers(prev => prev.filter(id => String(id) !== String(user.id))); }}
-                      sx={{ bgcolor: 'grey.300', color: 'grey.800' }}
+                      onDelete={() => setSelectedObservers(prev => prev.filter(id => id !== user.id))}
+                      sx={{ bgcolor: 'info.light', color: 'white' }}
                     />
                   ))
                 }

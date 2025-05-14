@@ -7,36 +7,17 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
   const contact = lead.contact || {};
   const company = contact.company || {};
   
-  // Общий стиль для меток с точками
-  // Создаем функцию, которая будет возвращать стиль для каждой метки
-  const getLabelStyle = (labelText) => ({
-    color: 'text.disabled', 
-    width: '92px', 
+  // Стиль для меток
+  const labelStyle = {
+    color: 'text.disabled',
+    width: '92px',
     flexShrink: 0,
-    display: 'inline-flex',
-    alignItems: 'flex-end', // Выравнивание по нижнему краю
-    '& .label-text': {
-      position: 'relative',
-      backgroundColor: 'grey.50',
-      zIndex: 2,
-      marginBottom: '2px' // Добавляем отступ снизу, чтобы текст не касался точек
-    },
-    '& .dots': {
-      flex: 1,
-      overflow: 'hidden',
-      height: '1px',
-      borderBottom: '1px dotted rgba(0,0,0,0.2)',
-      marginLeft: '4px',
-      marginRight: '4px',
-      position: 'relative',
-      bottom: '4px' // Располагаем точки по нижнему краю
-    }
-  });
+    minWidth: '92px'
+  };
   
   // Стиль для значения
   const valueStyle = {
-    color: 'text.primary',
-    paddingLeft: '4px'
+    color: 'text.primary'
   };
 
   // Маппинг русской метки отдела в технический код
@@ -119,64 +100,46 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
   return (
     <Card
       elevation={0}
-      sx={{ p: '4px', width: '100%', boxShadow: 'none', border: 'none', backgroundColor: 'grey.50' }}
+      sx={{ p: '2px', width: '100%', boxShadow: 'none', border: 'none', backgroundColor: 'grey.50' }}
     >
       <CardContent sx={{ p: '2px' }}>
 
         {/* Создаем общий стиль для меток с фиксированной шириной */}
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Продукт')}>
-            <span className="label-text">Продукт</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {deal.department || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Продукт...... :</Box>
+          <Box component="span" sx={valueStyle}>{deal.department || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Стоимость')}>
-            <span className="label-text">Стоимость</span>
-            <span className="dots"></span>
-          </Box>
+          <Box component="span" sx={labelStyle}>Стоимость. :</Box>
           <Box component="span" sx={valueStyle}>
-            : {formatAmount(deal.contract_amount)}
+            {formatAmount(deal.contract_amount)}
           </Box>
         </Box>
 
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Компания')}>
-            <span className="label-text">Компания</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {company.name || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Компания.. :</Box>
+          <Box component="span" sx={valueStyle}>{company.name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Контакт')}>
-            <span className="label-text">Контакт</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {contact.name || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Контакт....... :</Box>
+          <Box component="span" sx={valueStyle}>{contact.name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Телефон')}>
-            <span className="label-text">Телефон</span>
-            <span className="dots"></span>
-          </Box>
+          <Box component="span" sx={labelStyle}>Телефон...... :</Box>
           <Box component="span" sx={valueStyle}>
-            : <span>{contact.phone || '—'}</span>
+            <span>{contact.phone || '—'}</span>
             {contact.messenger && <span style={{ marginLeft: '4px' }}>({contact.messenger})</span>}
           </Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Email')}>
-            <span className="label-text">Email</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {contact.email || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Email............. :</Box>
+          <Box component="span" sx={valueStyle}>{contact.email || '—'}</Box>
         </Box>
 
         <Divider sx={{ my: 1 }} />
@@ -212,56 +175,34 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Менеджер')}>
-            <span className="label-text">Менеджер</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {deal.responsible?.full_name || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Менеджер. :</Box>
+          <Box component="span" sx={valueStyle}>{deal.responsible?.full_name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={getLabelStyle('Оператор')}>
-            <span className="label-text">Оператор</span>
-            <span className="dots"></span>
-          </Box>
-          <Box component="span" sx={valueStyle}>: {deal.lead.converted_by?.full_name || '—'}</Box>
+          <Box component="span" sx={labelStyle}>Оператор... :</Box>
+          <Box component="span" sx={valueStyle}>{deal.lead.converted_by?.full_name || '—'}</Box>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Box sx={{ 
-            display: 'inline-flex',
-            alignItems: 'center', 
-            width: '92px', 
-            flexShrink: 0
-          }}>
-            {deal.account_details?.full_name ? (
-              // Если аккаунт добавлен, стиль как у обычной метки
-              <>
-                <Box 
-                  component="span"
-                  className="label-text" 
-                  onClick={handleOpenAcc}
-                  sx={{ 
-                    color: 'text.disabled', // Такой же цвет как у всех меток
-                    backgroundColor: 'grey.50',
-                    cursor: 'pointer' // По-прежнему кликабельная
-                  }}
-                >
-                  Аккаунт
-                </Box>
-                <span className="dots" style={{ 
-                  flex: 1, 
-                  overflow: 'hidden', 
-                  height: '1px', 
-                  borderBottom: '1px dotted rgba(0,0,0,0.2)', 
-                  marginLeft: '4px', 
-                  marginRight: '4px', 
-                  position: 'relative', 
-                  bottom: '4px' 
-                }}></span>
-              </>
-            ) : (
-              // Если аккаунт не добавлен, оформляем как кнопку без точек
+        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+          {deal.account_details?.full_name ? (
+            // Если аккаунт добавлен
+            <>
+              <Box 
+                component="span"
+                onClick={handleOpenAcc}
+                sx={{ 
+                  ...labelStyle, 
+                  cursor: 'pointer'
+                }}
+              >
+                Аккаунт....... :
+              </Box>
+              <Box component="span" sx={valueStyle}>{deal.account_details?.full_name}</Box>
+            </>
+          ) : (
+            // Если аккаунт не добавлен
+            <>
               <Box 
                 component="button"
                 onClick={handleOpenAcc}
@@ -272,57 +213,40 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
                   borderColor: 'grey.300',
                   borderRadius: 1,
                   padding: '2px 6px',
-                  fontSize: '0.75rem',
+                  fontSize: '1rem',
                   cursor: 'pointer',
                   '&:hover': {
                     backgroundColor: 'grey.200'
                   },
                   transition: 'background-color 0.3s',
-                  width: '100%' // Заполняем всю ширину
+                  width: '92px'
                 }}
               >
                 Аккаунт
               </Box>
-            )}
-          </Box>
-          <Box component="span" sx={valueStyle}>: {deal.account_details?.full_name}</Box>
+              <Box component="span" sx={{ ...valueStyle, marginLeft: '8px' }}>не добавлен</Box>
+            </>
+          )}
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Box sx={{ 
-            display: 'inline-flex',
-            alignItems: 'center', 
-            width: '92px', 
-            flexShrink: 0
-          }}>
-            {deal.participants_details && deal.participants_details.length > 0 ? (
-              // Если участники добавлены, стиль как у обычной метки
-              <>
-                <Box 
-                  component="span"
-                  className="label-text" 
-                  onClick={handleOpenPart}
-                  sx={{ 
-                    color: 'text.disabled', 
-                    backgroundColor: 'grey.50',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Участники
-                </Box>
-                <span className="dots" style={{ 
-                  flex: 1, 
-                  overflow: 'hidden', 
-                  height: '1px', 
-                  borderBottom: '1px dotted rgba(0,0,0,0.2)', 
-                  marginLeft: '4px', 
-                  marginRight: '4px', 
-                  position: 'relative', 
-                  bottom: '4px' 
-                }}></span>
-              </>
-            ) : (
-              // Если участники не добавлены, оформляем как кнопку
+        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+          {deal.participants_details && deal.participants_details.length > 0 ? (
+            // Если участники добавлены
+            <>
+              <Box 
+                component="span"
+                onClick={handleOpenPart}
+                sx={{ 
+                  ...labelStyle, 
+                  cursor: 'pointer'
+                }}
+              >
+                Участники:
+              </Box>
+            </>
+          ) : (
+            // Если участники не добавлены
+            <>
               <Box 
                 component="button"
                 onClick={handleOpenPart}
@@ -333,20 +257,20 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
                   borderColor: 'grey.300',
                   borderRadius: 1,
                   padding: '2px 6px',
-                  fontSize: '0.75rem',
+                  fontSize: '1rem',
                   cursor: 'pointer',
                   '&:hover': {
                     backgroundColor: 'grey.200'
                   },
                   transition: 'background-color 0.3s',
-                  width: '100%' 
+                  width: '92px'
                 }}
               >
                 Участники
               </Box>
-            )}
-          </Box>
-          <Box component="span" sx={valueStyle}>:</Box>
+              <Box component="span" sx={{ ...valueStyle, marginLeft: '8px' }}>не добавлены</Box>
+            </>
+          )}
         </Box>
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', p: '1px' }}>
           {deal.participants_details && deal.participants_details.length > 0 ? (
