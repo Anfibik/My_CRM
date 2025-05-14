@@ -944,24 +944,50 @@ const TaskDetail = () => {
             </Box>
             
             {/* Список участников */}
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', p: '1px', mb: 2, ml: 2 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: 0.5, 
+              p: '1px', 
+              mb: 2, 
+              ml: 2 
+            }}>
               {task.participants_details && task.participants_details.length > 0 ? (
-                task.participants_details.map(participant => (
-                  <Tooltip
-                    key={participant.id}
-                    title={`${getRoleLabel(participant.role) || ''}${participant.role && participant.department ? ' / ' : ''}${getDepartmentLabel(participant.department) || ''}`}
-                    arrow
-                    enterDelay={1000}
-                  >
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%' }}>
+                  {task.participants_details.map((participant, index) => (
                     <Chip
+                      key={participant.id}
                       label={participant.full_name}
                       size="small"
                       deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
                       onDelete={(e) => { e.stopPropagation(); removeParticipant(participant.id); }}
-                      sx={{ bgcolor: 'grey.300', color: 'grey.800', fontSize: '0.65rem', height: 24 }}
+                      sx={{
+                        width: 'calc(50% - 4px)', // Adjusted width: 50% minus 2px for left margin and 2px for right margin
+                        margin: '2px',             // Added 2px margin on all sides
+                        boxSizing: 'border-box',
+                        paddingRight: index % 2 === 0 ? theme => theme.spacing(0.5) : 0,
+                        paddingLeft: index % 2 !== 0 ? theme => theme.spacing(0.5) : 0,
+                        marginBottom: theme => theme.spacing(1), // Kept for existing vertical spacing, will combine with new margin
+                        bgcolor: 'grey.300',
+                        color: 'grey.800',
+                        fontSize: '0.65rem',
+                        height: 24,
+                        display: 'flex', // Добавим это к самому Chip, чтобы он лучше управлял дочерними элементами
+                        alignItems: 'center', // Выравниваем label и icon по центру вертикально
+                        '& .MuiChip-label': {
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          minWidth: 0, // Позволяет тексту сжиматься и показывать '...'
+                          flexGrow: 1, // Позволяет метке занимать доступное пространство, но сжиматься при необходимости
+                        },
+                        '& .MuiChip-deleteIcon': {
+                          flexShrink: 0, // Запрещаем иконке сжиматься
+                        }
+                      }}
                     />
-                  </Tooltip>
-                ))
+                  ))}
+                </Box>
               ) : null}
             </Box>
 
@@ -1014,7 +1040,7 @@ const TaskDetail = () => {
             </Box>
             
             {/* Список наблюдателей */}
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', p: '1px', mb: 2, ml: 2 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, p: '1px', mb: 2, ml: 2 }}>
               {task.observers_details && task.observers_details.length > 0 ? (
                 task.observers_details.map(observer => (
                   <Tooltip
@@ -1024,7 +1050,7 @@ const TaskDetail = () => {
                     enterDelay={300}
                   >
                     <Chip
-                      label={observer.full_name} // Используем full_name
+                      label={observer.full_name}
                       size="small"
                       deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
                       onDelete={(e) => { e.stopPropagation(); removeObserver(observer.id); }}
