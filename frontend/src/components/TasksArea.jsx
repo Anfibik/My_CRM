@@ -1,7 +1,22 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Box, Typography, Button, Grid, Card, CardContent, Chip, CircularProgress } from '@mui/material';
+import { Box, Typography, IconButton, Grid, Card, CardContent, Chip, CircularProgress, Divider, Tooltip } from '@mui/material';
 import axios from 'axios';
 import AddIcon from '@mui/icons-material/Add';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import DoneIcon from '@mui/icons-material/Done';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import CancelIcon from '@mui/icons-material/Cancel';
+import LoopIcon from '@mui/icons-material/Loop';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import ConstructionIcon from '@mui/icons-material/Construction';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+
+
 
 // Настройка axios для работы с авторизацией
 
@@ -55,13 +70,89 @@ console.log('Настройка авторизации axios завершена'
 // Ленивая загрузка модального окна, чтобы избежать циклических зависимостей
 const TaskModal = lazy(() => import('./TaskModal'));
 
+const TASK_TYPE_LABELS = {
+  "approval": "Согласование",
+  "payment": "Оплата",
+  "delivery": "Доставка",
+  "universal": "Универсальная",
+};
+
+const getTaskTypeLabel = (taskType) => {
+  return TASK_TYPE_LABELS[taskType] || taskType; // Fallback to raw type if not found
+};
+
+// Copied and modified from TaskDetail.jsx to get remaining working hours
+const getRemainingWorkHours = (deadlineString) => {
+  if (!deadlineString) return Infinity; // No deadline, consider it far away
+
+  const now = new Date();
+  const deadline = new Date(deadlineString);
+
+  if (deadline < now) return 0; // Deadline passed
+
+  let remainingHours = 0;
+  let currentDate = new Date(now);
+  currentDate.setMinutes(0, 0, 0);
+  currentDate.setHours(currentDate.getHours() + 1);
+
+  // Count full working hour slots that start from `currentDate` and before `deadline`.
+  while (currentDate <= deadline) { 
+    const dayOfWeek = currentDate.getDay();
+    const hours = currentDate.getHours(); // This is the START of the 1-hour slot.
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && hours >= 9 && hours < 18) {
+      remainingHours++;
+    }
+    currentDate.setHours(currentDate.getHours() + 1);
+  }
+  return remainingHours;
+};
+
+const getDeadlineDisplayInfo = (deadlineString) => {
+  if (!deadlineString) {
+    return {
+      text: 'Дедлайн не указан',
+      icon: <AccessTimeIcon fontSize="small" />,
+      color: 'grey.500'
+    };
+  }
+
+  const hours = getRemainingWorkHours(deadlineString);
+
+  if (hours === 0 && new Date(deadlineString) < new Date()) { // Explicitly check if deadline passed
+    return {
+      text: 'Просрочено',
+      icon: <AccessTimeIcon fontSize="small" />,
+      color: 'error.main'
+    };
+  }
+  if (hours <= 2) {
+    return {
+      text: `Осталось ${hours} ч`,
+      icon: <AccessTimeIcon fontSize="small" />,
+      color: 'error.main'
+    };
+  }
+  if (hours <= 10) {
+    return {
+      text: `Осталось ${hours} ч`,
+      icon: <AccessTimeIcon fontSize="small" />,
+      color: 'warning.main' // orange
+    };
+  }
+  return {
+    text: `Осталось ${hours} ч`,
+    icon: <AccessTimeIcon fontSize="small" />,
+    color: 'grey.500'
+  };
+};
+
 const TasksArea = ({ deal }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   // Загружаем задачи для текущей сделки
   useEffect(() => {
     if (deal?.id) {
@@ -80,10 +171,10 @@ const TasksArea = ({ deal }) => {
         });
     }
   }, [deal]);
-  
+
   // Загружаем текущего пользователя и список всех пользователей для выбора в модальном окне
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   // Загрузка текущего пользователя
   useEffect(() => {
     console.log('Попытка загрузить текущего пользователя...');
@@ -96,7 +187,7 @@ const TasksArea = ({ deal }) => {
         console.error("Ошибка загрузки текущего пользователя:", err);
       });
   }, []);
-  
+
   // Загрузка всех пользователей
   useEffect(() => {
     console.log('Попытка загрузить всех пользователей...');
@@ -104,12 +195,12 @@ const TasksArea = ({ deal }) => {
       .then(response => {
         console.log('Ответ от API пользователей:', response);
         console.log('Данные API пользователей:', response.data);
-        
+
         // Проверим, какой формат данных приходит (массив или с полем results)
         const allUsers = response.data.results || response.data;
         console.log('Извлеченные пользователи:', allUsers);
         console.log('Количество пользователей:', allUsers.length);
-        
+
         // Исключаем текущего пользователя если он загружен
         if (currentUser && currentUser.id) {
           console.log('Фильтрация пользователей, исключая ID:', currentUser.id);
@@ -119,9 +210,9 @@ const TasksArea = ({ deal }) => {
           setUsers(filteredUsers);
         } else {
           console.log('Текущий пользователь не загружен, использую всех пользователей');
-          setUsers(allUsers); 
+          setUsers(allUsers);
         }
-        
+
         if (allUsers.length === 0) {
           console.warn("ВНИМАНИЕ: Не найдено ни одного пользователя в ответе");
         }
@@ -145,7 +236,7 @@ const TasksArea = ({ deal }) => {
       ...taskData,
       deal: deal?.id
     };
-    
+
     setIsLoading(true);
     axios.post('/api/tasks/', newTask)
       .then(response => {
@@ -164,12 +255,12 @@ const TasksArea = ({ deal }) => {
   // Хелперы для отображения статуса и приоритета
   const getStatusColor = (status) => {
     const colors = {
-      'not_accepted': 'default',
-      'pending': 'info',
+      'not_accepted': 'error',
+      'pending': 'warning',
       'accepted': 'secondary',
       'in_progress': 'primary',
       'completed': 'success',
-      'closed': 'error'
+      'closed': 'default'
     };
     return colors[status] || 'default';
   };
@@ -186,40 +277,65 @@ const TasksArea = ({ deal }) => {
     return labels[status] || 'Неизвестно';
   };
 
+  const getStatusIcon = (status) => {
+    const icons = {
+      'not_accepted': <CancelIcon fontSize="small" />,
+      'pending': <PauseCircleOutlineIcon fontSize="small" />,
+      'accepted': <CheckCircleOutlineIcon fontSize="small" />,
+      'in_progress': <ConstructionIcon  fontSize="small" />,
+      'completed': <DoneIcon fontSize="small" />,
+      'closed': <LockOutlinedIcon fontSize="small" />
+    };
+    return icons[status] || null;
+  };
+
   const getPriorityColor = (priority) => {
     const colors = {
-      'low': 'success',
-      'medium': 'warning',
-      'high': 'error'
+      'low': 'action.active',
+      'high': 'warning'
     };
     return colors[priority] || 'default';
   };
 
   const getPriorityLabel = (priority) => {
     const labels = {
-      'low': 'Низкий',
-      'medium': 'Средний',
-      'high': 'Высокий'
+      'low': 'Планово',
+      'high': 'Критично'
     };
     return labels[priority] || 'Неизвестно';
   };
 
+  const getPriorityIcon = (priority) => {
+    const icons = {
+      'low': <LoopIcon fontSize="small" />,
+      'high': <WarningAmberIcon fontSize="small" />
+    };
+    return icons[priority] || null;
+  };
+
   return (
-    <div className="mt-4 p-4 rounded shadow">
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6" component="h2">
-          Задачи по сделке
-        </Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleOpenModal}
-          startIcon={<AddIcon />}
-          disabled={!deal?.id}
-        >
-          Добавить задачу
-        </Button>
+    <div className="p-2">
+      <Box sx={{display: 'flex', alignItems: 'center' }}>
+
+        <Box sx={{ mr: 2, alignItems: 'center' }}>
+          <Typography variant="h6" component="h2">
+            Задачи <IconButton
+              color="primary"
+              onClick={handleOpenModal}
+              disabled={!deal?.id}
+              aria-label="Добавить задачу"
+            > <AddIcon />
+            </IconButton>
+          </Typography>
+        </Box>
+        
+        <Box sx={{ mr: 2 }}>фильтр 1</Box>
+        <Box sx={{ mr: 2 }}>фильтр 2</Box>
+        <Box sx={{ mr: 2 }}>фильтр 3 </Box>
+
       </Box>
+
+      <Divider sx={{ my: 1, mt: 0 }} />
 
       {error && (
         <Box sx={{ mb: 2, color: 'error.main' }}>
@@ -228,45 +344,63 @@ const TasksArea = ({ deal }) => {
       )}
 
       {isLoading ? (
-        <Box sx={{ textAlign: 'center', py: 2 }}>
+        <Box sx={{ textAlign: 'center', py: 0 }}>
           Загрузка...
         </Box>
       ) : tasks.length > 0 ? (
-        <Grid container spacing={2}>
+        <Grid container spacing={1}>
           {tasks.map(task => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={task.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
+              <Card
+                sx={{
+                  height: '130px',
+                  width: '150px',
                   cursor: 'pointer',
+                  border: task.priority === 'high' ? '4px solid' : 'none',
+                  borderColor: task.priority === 'high' ? 'error.main' : undefined,
+                  backgroundColor: 'rgba(237, 237, 237, 0.8)', // Always light grey
                   '&:hover': {
-                    boxShadow: 6
+                    boxShadow: 4
                   }
                 }}
                 onClick={() => window.location.href = `/tasks/${task.id}`}
               >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                      ID: {task.id}
-                    </Typography>
-                    <Chip 
-                      label={getStatusLabel(task.status)} 
-                      color={getStatusColor(task.status)} 
-                      size="small" 
-                    />
+                <CardContent sx={{ padding: 0.5, '&:last-child': { pb: 0 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, width: '100%' }}>
+                    <Tooltip title={getStatusLabel(task.status)} placement="top">
+                      {React.cloneElement(getStatusIcon(task.status), { sx: { color: `${getStatusColor(task.status)}.main` } })}
+                    </Tooltip>
+
+                    <Tooltip title={getTaskTypeLabel(task.task_type)} placement="top">
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          flexGrow: 1,
+                          textAlign: 'center',
+                          mx: 0, // Margin between icons and text
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: '0.75rem', // Adjusted for fitting "Универсальная"
+                          lineHeight: '1.2', // Adjust line height for small font
+                        }}
+                      >
+                        {getTaskTypeLabel(task.task_type)}
+                      </Typography>
+                    </Tooltip>
+
+                    {(() => {
+                      const deadlineInfo = getDeadlineDisplayInfo(task.deadline);
+                      return (
+                        <Tooltip title={deadlineInfo.text} placement="top">
+                          {React.cloneElement(deadlineInfo.icon, { sx: { color: deadlineInfo.color } })}
+                        </Tooltip>
+                      );
+                    })()}
                   </Box>
                   <Typography variant="h6" noWrap title={task.title}>
                     {task.title}
                   </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Chip 
-                      label={getPriorityLabel(task.priority)} 
-                      color={getPriorityColor(task.priority)} 
-                      size="small" 
-                      sx={{ mr: 0.5 }}
-                    />
-                  </Box>
                 </CardContent>
               </Card>
             </Grid>
@@ -280,9 +414,9 @@ const TasksArea = ({ deal }) => {
 
       <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>}>
         {isModalOpen && (
-          <TaskModal 
-            open={isModalOpen} 
-            onClose={handleCloseModal} 
+          <TaskModal
+            open={isModalOpen}
+            onClose={handleCloseModal}
             onSubmit={handleCreateTask}
             users={users}
             dealId={deal?.id}

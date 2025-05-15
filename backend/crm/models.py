@@ -387,8 +387,7 @@ class Task(models.Model):
     ]
     
     PRIORITY_CHOICES = [
-        ("low", "Низкий"),
-        ("medium", "Средний"),
+        ("low", "Стандартный"),
         ("high", "Высокий"),
     ]
     

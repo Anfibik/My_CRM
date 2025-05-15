@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper, Divider, Chip, Button, Grid,
   Avatar, TextField, CircularProgress, IconButton, Tooltip,
   Card, CardContent, List, ListItem, ListItemText, Menu, MenuItem,
   Dialog, DialogTitle, DialogContent, DialogActions, Autocomplete,
-  Checkbox
+  Checkbox, useTheme // Добавляем useTheme
 } from '@mui/material';
 import axios from 'axios';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -25,6 +25,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 axios.defaults.withCredentials = true;
 
 const TaskDetail = () => {
+  const theme = useTheme(); // Вызываем хук useTheme в начале компонента
   const { id } = useParams();
   const navigate = useNavigate();
   const [task, setTask] = useState(null);
@@ -306,7 +307,7 @@ const TaskDetail = () => {
     // Определяем статус и иконку в зависимости от оставшегося времени
     let status, icon;
     
-    if (remainingHours < 2) {
+    if (remainingHours <= 2) {
       status = 'critical'; // красный
       icon = 'warning';
     } else if (remainingHours <= 10) {
@@ -337,10 +338,6 @@ const TaskDetail = () => {
   };
 
   const getStatusColor = (status) => {
-    // Для статуса закрыта возвращаем черный
-    if (status === 'closed') {
-      return 'grey'; // Темно-серый (сработает с .dark модификатором)
-    }
     
     const colors = {
       'not_accepted': 'error',     // красный
@@ -348,15 +345,15 @@ const TaskDetail = () => {
       'accepted': 'secondary',     // фиолетовый (Material UI secondary color)
       'in_progress': 'primary',    // синий
       'completed': 'success',      // зеленый
+      'closed': 'default'
     };
     return colors[status] || 'default';
   };
 
   const getPriorityLabel = (priority) => {
     const labels = {
-      'low': 'Низкий',
-      'medium': 'Средний',
-      'high': 'Высокий'
+      'low': 'Планово',
+      'high': 'Критично'
     };
     return labels[priority] || 'Неизвестно';
   };
@@ -381,28 +378,26 @@ const TaskDetail = () => {
     return labels[type] || 'Универсальная';
   };
 
-  const getDepartmentLabel = (departmentCode) => {
+  const getDepartmentLabel = useCallback((departmentCode) => { 
     if (!departmentCode) return '';
-    
     const departments = {
-      'warehouses': 'ШМБ',
-      'racks': 'Стеллажные системы',
-      'warehouses_machines': 'Складская техника',
-      'plastic_containers': 'Пластиковая тара',
-      'trash_bins': 'Мусорные баки',
-      'sorting_systems': 'Системы сортировки',
-      'automation': 'Автоматизация',
-      'services': 'Сервисные услуги',
-      'administrations': 'Администрация',
-      'logistics': 'Логистика',
-      'finance': 'Финансы и бухгалтерия',
-      'marketing': 'Маркетинг'
+        "warehouses": "ШМБ",
+        "racks": "Стеллажные системы",
+        "warehouses_machines": "Складская техника",
+        "plastic_containers": "Пластиковая тара",
+        "trash_bins": "Мусорные баки",
+        "sorting_systems": "Системы сортировки",
+        "automation": "Автоматизация",
+        "services": "Сервисные услуги",
+        "administrations": "Администрация",
+        "logistics": "Логистика",
+        "finance": "Финансы и бухгалтерия",
+        "marketing": "Маркетинг",
     };
-    
     return departments[departmentCode] || departmentCode;
-  };
+  }, []); 
 
-  const getRoleLabel = (roleCode) => {
+  const getRoleLabel = useCallback((roleCode) => {
     if (!roleCode) return '';
     const roleMap = {
       'owner': 'Собственник',
@@ -421,7 +416,30 @@ const TaskDetail = () => {
       'sales': 'Продажи'
     };
     return roleMap[roleCode] || roleCode;
-  };
+  }, []);
+
+  // Группировка и сортировка участников по ДЕПАРТАМЕНТАМ
+  const groupedAndSortedParticipants = useMemo(() => {
+    if (!task || !task.participants_details || task.participants_details.length === 0) { 
+      return [];
+    }
+
+    const groups = task.participants_details.reduce((acc, participant) => {
+      const departmentLabel = getDepartmentLabel(participant.department) || 'Без отдела'; // Группируем по департаменту
+      if (!acc[departmentLabel]) {
+        acc[departmentLabel] = [];
+      }
+      acc[departmentLabel].push(participant);
+      return acc;
+    }, {});
+
+    const sortedDepartmentLabels = Object.keys(groups).sort((a, b) => a.localeCompare(b)); // Сортируем названия департаментов
+    
+    return sortedDepartmentLabels.map(departmentLabel => ({
+      departmentLabel, // Используем departmentLabel
+      participants: groups[departmentLabel]
+    }));
+  }, [task, getDepartmentLabel]); // Зависимость от getDepartmentLabel
 
   // Функция для фильтрации доступных пользователей
   const filterAvailableUsers = (users) => {
@@ -909,10 +927,19 @@ const TaskDetail = () => {
                       flexShrink: 0, 
                       minWidth: '92px',
                       fontSize: '0.85rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'inline-flex', 
+                      alignItems: 'center'
                     }}
                   >
-                    Участники:
+                    <Typography variant="subtitle1" sx={{ 
+                      fontWeight: 'bold', // Жирный шрифт для 'Участники'
+                      color: 'grey.800', // Темно-серый цвет для 'Участники'
+                      fontSize: '1rem', // Немного больший шрифт для 'Участники'
+                      mr: 1 
+                    }}>
+                      Участники:
+                    </Typography>
                   </Box>
                 </>
               ) : (
@@ -949,45 +976,71 @@ const TaskDetail = () => {
               flexWrap: 'wrap', 
               gap: 0.5, 
               p: '1px', 
-              mb: 2, 
+              mb: 1, 
               ml: 2 
             }}>
-              {task.participants_details && task.participants_details.length > 0 ? (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%' }}>
-                  {task.participants_details.map((participant, index) => (
-                    <Chip
-                      key={participant.id}
-                      label={participant.full_name}
-                      size="small"
-                      deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
-                      onDelete={(e) => { e.stopPropagation(); removeParticipant(participant.id); }}
-                      sx={{
-                        width: 'calc(50% - 4px)', // Adjusted width: 50% minus 2px for left margin and 2px for right margin
-                        margin: '2px',             // Added 2px margin on all sides
-                        boxSizing: 'border-box',
-                        paddingRight: index % 2 === 0 ? theme => theme.spacing(0.5) : 0,
-                        paddingLeft: index % 2 !== 0 ? theme => theme.spacing(0.5) : 0,
-                        marginBottom: theme => theme.spacing(1), // Kept for existing vertical spacing, will combine with new margin
-                        bgcolor: 'grey.300',
-                        color: 'grey.800',
-                        fontSize: '0.65rem',
-                        height: 24,
-                        display: 'flex', // Добавим это к самому Chip, чтобы он лучше управлял дочерними элементами
-                        alignItems: 'center', // Выравниваем label и icon по центру вертикально
-                        '& .MuiChip-label': {
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          minWidth: 0, // Позволяет тексту сжиматься и показывать '...'
-                          flexGrow: 1, // Позволяет метке занимать доступное пространство, но сжиматься при необходимости
-                        },
-                        '& .MuiChip-deleteIcon': {
-                          flexShrink: 0, // Запрещаем иконке сжиматься
-                        }
+              {groupedAndSortedParticipants.length > 0 ? (
+                groupedAndSortedParticipants.map((group, groupIndex) => (
+                  <Box 
+                    key={group.departmentLabel} 
+                    sx={{ 
+                      width: '100%', 
+                      mb: 0.75, 
+                      // Применяем borderBottom ко всем, кроме последнего элемента
+                      borderBottom: groupIndex < groupedAndSortedParticipants.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
+                      pb: groupIndex < groupedAndSortedParticipants.length - 1 ? 0.75 : 0 // Убираем padding-bottom у последнего элемента тоже
+                    }}
+                  > 
+                    <Typography 
+                      variant="subtitle2" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: 'normal', 
+                        color: 'grey.600', 
+                        fontSize: '0.875rem', 
+                        mb: 0.25, 
+                        width: '100%'
                       }}
-                    />
-                  ))}
-                </Box>
+                    >
+                      {group.departmentLabel}
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', pt: 0.25 }}> 
+                      {group.participants.map((participant, index) => (
+                        <Chip
+                          key={participant.id}
+                          label={participant.full_name}
+                          size="small"
+                          deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />} 
+                          onDelete={(e) => { e.stopPropagation(); removeParticipant(participant.id); }}
+                          sx={{
+                            width: 'calc(50% - 2px)', 
+                            margin: '1px',             
+                            boxSizing: 'border-box',
+                            // Важно: index теперь относится к списку участников *внутри группы*
+                            paddingRight: index % 2 === 0 ? theme.spacing(0.5) : 0,
+                            paddingLeft: index % 2 !== 0 ? theme.spacing(0.5) : 0,
+                            bgcolor: 'grey.300',
+                            color: 'grey.800',
+                            fontSize: '0.65rem',
+                            height: 24,
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            '& .MuiChip-label': {
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              minWidth: 0, 
+                              flexGrow: 1, 
+                            },
+                            '& .MuiChip-deleteIcon': {
+                              flexShrink: 0, 
+                            }
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                ))
               ) : null}
             </Box>
 
@@ -1069,11 +1122,6 @@ const TaskDetail = () => {
 
           {/* Основная область контента */}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Панель статусов справа */}
-            <Box sx={{ position: 'absolute', right: 0, top: '100px', bottom: 0, width: '30px', bgcolor: '#f0f0f0', borderLeft: '1px solid #ccc', display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2 }}>
-              <Typography sx={{ transform: 'rotate(90deg)', whiteSpace: 'nowrap', my: 5 }}>Статусы</Typography>
-            </Box>
-
             {/* Описание задачи */}
             <Box sx={{ flex: 1, p: 2, overflowY: 'auto', mr: '30px' }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
