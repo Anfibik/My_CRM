@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Box, Typography, IconButton, Grid, Card, CardContent, Chip, CircularProgress, Divider, Tooltip } from '@mui/material';
+import { Box, Typography, IconButton, Grid, Card, CardContent, Chip, CircularProgress, Divider, Tooltip, useTheme } from '@mui/material';
 import axios from 'axios';
 import AddIcon from '@mui/icons-material/Add';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -15,6 +15,10 @@ import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import EditIcon from '@mui/icons-material/Edit';
+import WarningIcon from '@mui/icons-material/Warning';
+import TaskModal from './TaskModal'; 
+import { STATUS_LABELS, TASK_TYPE_LABELS } from '../constants'; // Import constants
 
 
 
@@ -31,14 +35,14 @@ axios.defaults.withCredentials = true;
 const jwtToken = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
 if (jwtToken) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${jwtToken}`;
-  console.log('Найден JWT токен, добавлен в заголовки');
+  // console.log('Найден JWT токен, добавлен в заголовки');
 }
 
 // 4. Проверяем токен DRF в localStorage
 const drfToken = localStorage.getItem('token');
 if (drfToken) {
   axios.defaults.headers.common['Authorization'] = `Token ${drfToken}`;
-  console.log('Найден DRF токен, добавлен в заголовки');
+  // console.log('Найден DRF токен, добавлен в заголовки');
 }
 
 // 5. Добавляем CSRF токен
@@ -60,25 +64,18 @@ function getCookie(name) {
 const csrftoken = getCookie('csrftoken');
 if (csrftoken) {
   axios.defaults.headers.common['X-CSRFToken'] = csrftoken;
-  console.log('CSRF токен добавлен в заголовки');
+  // console.log('CSRF токен добавлен в заголовки');
 } else {
-  console.warn('CSRF токен не найден в cookies');
+  // console.warn('CSRF токен не найден в cookies');
 }
 
-console.log('Настройка авторизации axios завершена');
+// console.log('Настройка авторизации axios завершена');
 
 // Ленивая загрузка модального окна, чтобы избежать циклических зависимостей
-const TaskModal = lazy(() => import('./TaskModal'));
-
-const TASK_TYPE_LABELS = {
-  "approval": "Согласование",
-  "payment": "Оплата",
-  "delivery": "Доставка",
-  "universal": "Универсальная",
-};
+// const TaskModal = lazy(() => import('./TaskModal'));
 
 const getTaskTypeLabel = (taskType) => {
-  return TASK_TYPE_LABELS[taskType] || taskType; // Fallback to raw type if not found
+  return TASK_TYPE_LABELS[taskType] || 'Неизвестный тип';
 };
 
 // Copied and modified from TaskDetail.jsx to get remaining working hours
@@ -147,6 +144,7 @@ const getDeadlineDisplayInfo = (deadlineString) => {
 };
 
 const TasksArea = ({ deal }) => {
+  const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -177,10 +175,10 @@ const TasksArea = ({ deal }) => {
 
   // Загрузка текущего пользователя
   useEffect(() => {
-    console.log('Попытка загрузить текущего пользователя...');
+    // console.log('Попытка загрузить текущего пользователя...');
     axios.get('/api/auth/me', { withCredentials: true })
       .then(response => {
-        console.log('Текущий пользователь загружен:', response.data);
+        // console.log('Текущий пользователь загружен:', response.data);
         setCurrentUser(response.data);
       })
       .catch(err => {
@@ -190,26 +188,26 @@ const TasksArea = ({ deal }) => {
 
   // Загрузка всех пользователей
   useEffect(() => {
-    console.log('Попытка загрузить всех пользователей...');
+    // console.log('Попытка загрузить всех пользователей...');
     axios.get('/api/users/', { withCredentials: true })
       .then(response => {
-        console.log('Ответ от API пользователей:', response);
-        console.log('Данные API пользователей:', response.data);
+        // console.log('Ответ от API пользователей:', response);
+        // console.log('Данные API пользователей:', response.data);
 
         // Проверим, какой формат данных приходит (массив или с полем results)
         const allUsers = response.data.results || response.data;
-        console.log('Извлеченные пользователи:', allUsers);
-        console.log('Количество пользователей:', allUsers.length);
+        // console.log('Извлеченные пользователи:', allUsers);
+        // console.log('Количество пользователей:', allUsers.length);
 
         // Исключаем текущего пользователя если он загружен
         if (currentUser && currentUser.id) {
-          console.log('Фильтрация пользователей, исключая ID:', currentUser.id);
+          // console.log('Фильтрация пользователей, исключая ID:', currentUser.id);
           const filteredUsers = allUsers.filter(user => user.id !== currentUser.id);
-          console.log('Отфильтрованные пользователи:', filteredUsers);
-          console.log('Количество отфильтрованных пользователей:', filteredUsers.length);
+          // console.log('Отфильтрованные пользователи:', filteredUsers);
+          // console.log('Количество отфильтрованных пользователей:', filteredUsers.length);
           setUsers(filteredUsers);
         } else {
-          console.log('Текущий пользователь не загружен, использую всех пользователей');
+          // console.log('Текущий пользователь не загружен, использую всех пользователей');
           setUsers(allUsers);
         }
 
@@ -266,15 +264,7 @@ const TasksArea = ({ deal }) => {
   };
 
   const getStatusLabel = (status) => {
-    const labels = {
-      'not_accepted': 'Не принята',
-      'pending': 'В ожидании',
-      'accepted': 'Принята',
-      'in_progress': 'В работе',
-      'completed': 'Выполнена',
-      'closed': 'Закрыта'
-    };
-    return labels[status] || 'Неизвестно';
+    return STATUS_LABELS[status] || 'Неизвестно';
   };
 
   const getStatusIcon = (status) => {
@@ -354,7 +344,7 @@ const TasksArea = ({ deal }) => {
               <Card
                 sx={{
                   height: '130px',
-                  width: '150px',
+                  width: '180px',
                   cursor: 'pointer',
                   border: task.priority === 'high' ? '4px solid' : 'none',
                   borderColor: task.priority === 'high' ? 'error.main' : undefined,
@@ -390,17 +380,99 @@ const TasksArea = ({ deal }) => {
                     </Tooltip>
 
                     {(() => {
-                      const deadlineInfo = getDeadlineDisplayInfo(task.deadline);
-                      return (
-                        <Tooltip title={deadlineInfo.text} placement="top">
-                          {React.cloneElement(deadlineInfo.icon, { sx: { color: deadlineInfo.color } })}
-                        </Tooltip>
-                      );
+                      const remainingHours = getRemainingWorkHours(task.deadline);
+                      const isOverdueForIcon = task.deadline && new Date(task.deadline) < new Date();
+                      let displayContent;
+
+                      if (isOverdueForIcon) {
+                        displayContent = (
+                          <Tooltip title="Просрочено" placement="top">
+                            <WarningIcon sx={{ color: theme.palette.error.main, fontSize: '1rem' }} />
+                          </Tooltip>
+                        );
+                      } else { // Not strictly overdue for icon display
+                        let displayTime = '';
+                        let textColor = theme.palette.text.secondary; // Default to grey
+
+                        if (remainingHours === Infinity) { // No deadline
+                          displayTime = 'Без срока';
+                        } else { // Deadline exists
+                          // Round remainingHours for display, use the original for logic if needed for precision
+                          const roundedHours = Math.round(remainingHours);
+                          displayTime = `${roundedHours}ч`; 
+                          
+                          // Apply color logic based on original getDeadlineDisplayInfo's spirit
+                          if (remainingHours <= 2) { // Covers 0, 1, 2 and can include negative if getRemainingWorkHours produces it
+                            textColor = theme.palette.error.main; // Red
+                          } else if (remainingHours <= 10) {
+                            textColor = theme.palette.warning.main; // Orange
+                          } else { // remainingHours > 10
+                            textColor = theme.palette.text.secondary; // Grey (or grey.500 like in original func)
+                          }
+                        }
+                        
+                        displayContent = (
+                          <Typography 
+                            variant="caption" 
+                            sx={{
+                              color: textColor, 
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold',
+                              textAlign: 'center',
+                              lineHeight: '1.2',
+                              minWidth: '45px',
+                              px: 0.5, 
+                            }}
+                          >
+                            {displayTime}
+                          </Typography>
+                        );
+                      }
+                      return displayContent;
                     })()}
                   </Box>
-                  <Typography variant="h6" noWrap title={task.title}>
-                    {task.title}
-                  </Typography>
+                  <Tooltip title={task.title} placement="top">
+                    <Typography 
+                      variant="h6" // Keep variant for semantics, but override styles
+                      sx={{
+                        fontSize: '0.7rem', 
+                        lineHeight: 1.2,    
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap', 
+                      }}
+                    >
+                      {task.title}
+                    </Typography>
+                  </Tooltip>
+                  
+                  {/* Author and Assignee Information */}
+                  <Box sx={{ mt: 0.5 }}> 
+                    <Typography variant="caption" component="div" sx={{ fontSize: '0.6rem', fontWeight: 'bold' }}>
+                      Автор:
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      component="div" 
+                      sx={{ fontSize: '0.6rem', pl: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} 
+                      title={task.author_details?.full_name || 'Не указан'}
+                    >
+                      {task.author_details?.full_name || 'Не указан'}
+                    </Typography>
+                    
+                    <Typography variant="caption" component="div" sx={{ fontSize: '0.6rem', fontWeight: 'bold', mt: 0.25 }}>
+                      Исполнитель:
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      component="div" 
+                      sx={{ fontSize: '0.6rem', pl: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} 
+                      title={task.executor_details?.full_name || 'Не назначен'}
+                    >
+                      {task.executor_details?.full_name || 'Не назначен'}
+                    </Typography>
+                  </Box>
+
                 </CardContent>
               </Card>
             </Grid>

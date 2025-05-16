@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, 
          Select, MenuItem, FormControl, InputLabel, Box, Checkbox, FormControlLabel } from '@mui/material';
+import { TASK_TYPE_LABELS, PRIORITY_LABELS, TASK_TYPE_OPTIONS } from '../constants';
 
 // Helper functions
 const formatDateTimeLocal = (date) => {
@@ -97,54 +98,49 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
     const option = e.target.value;
     setDeadlineOption(option);
     
-    // Расчёт нового дедлайна в зависимости от выбранной опции
-    let newDeadline = new Date();
+    let newDeadlineDate; // Changed variable name for clarity
     
     switch(option) {
       case 'twoHours':
-        // Текущее время + 2 часа
-        newDeadline.setHours(newDeadline.getHours() + 2);
+        newDeadlineDate = calculateDeadlineByAddingWorkHours(2); // Unified logic
         break;
         
       case 'today':
-        // Сегодня до 17:30
-        newDeadline.setHours(17, 30, 0, 0);
+        newDeadlineDate = new Date();
+        newDeadlineDate.setHours(17, 30, 0, 0);
         break;
         
       case 'tomorrow':
-        // Завтра до 17:30
-        newDeadline.setDate(newDeadline.getDate() + 1);
-        newDeadline.setHours(17, 30, 0, 0);
+        newDeadlineDate = new Date(calculateTomorrow1730());
         break;
-        
-      case 'thisWeek':
-        // До пятницы этой недели до 17:00
-        const dayOfWeek = newDeadline.getDay(); // 0 (вс) - 6 (сб)
-        const daysUntilFriday = dayOfWeek >= 5 ? 5 + 7 - dayOfWeek : 5 - dayOfWeek;
-        newDeadline.setDate(newDeadline.getDate() + daysUntilFriday);
-        newDeadline.setHours(17, 0, 0, 0);
-        break;
-        
+
       case 'manual':
-        // При выборе ручного режима не меняем дедлайн
-        return;
+        // If 'manual' is chosen, don't change the deadline here.
+        // It's either set by critical checkbox or manually input.
+        // If user just selected 'manual' from dropdown, we might want to clear isCritical
+        if (isCritical) {
+            setIsCritical(false); // User is overriding critical via manual selection
+            setTaskData(prev => ({ ...prev, priority: 'low' })); 
+        }
+        return; // Exit early, no automatic deadline change
+      default:
+        newDeadlineDate = new Date(calculateTomorrow1730()); // Default to tomorrow
     }
-    
-    // Корректно форматируем дату и время для ввода в HTML5 input datetime-local
-    // с учетом местного часового пояса
-    const year = newDeadline.getFullYear();
-    const month = String(newDeadline.getMonth() + 1).padStart(2, '0');
-    const day = String(newDeadline.getDate()).padStart(2, '0');
-    const hours = String(newDeadline.getHours()).padStart(2, '0');
-    const minutes = String(newDeadline.getMinutes()).padStart(2, '0');
-    
-    const formattedDeadline = `${year}-${month}-${day}T${hours}:${minutes}`;
-    
-    // Обновляем дедлайн в состоянии
-    setTaskData(prev => ({ 
-      ...prev, 
-      deadline: formattedDeadline
-    }));
+
+    setTaskData(prev => ({ ...prev, deadline: formatDateTimeLocal(newDeadlineDate) }));
+
+    // If a specific deadline option (not 'manual' and not related to 'critical' logic) is chosen,
+    // ensure critical status is turned off.
+    if (option !== 'manual') { // 'manual' is handled above or by critical checkbox
+        if (isCritical) {
+            setIsCritical(false);
+        }
+        // Also, if the priority was 'high' due to critical, reset it, unless the new option implies high priority.
+        // Current options ('twoHours', 'today', 'tomorrow') don't imply high priority.
+        if (taskData.priority === 'high') {
+            setTaskData(prev => ({ ...prev, priority: 'low' }));
+        }
+    }
   };
   
   // Функция для прямого изменения даты (при ручном выборе)
@@ -215,19 +211,18 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             />
 
             <FormControl fullWidth>
-              <InputLabel id="task-type-label">Тип задачи</InputLabel>
+              <InputLabel>Тип задачи</InputLabel>
               <Select
-                labelId="task-type-label"
-                id="task_type"
                 name="task_type"
                 value={taskData.task_type}
-                label="Тип задачи"
                 onChange={handleChange}
+                label="Тип задачи"
               >
-                <MenuItem value="approval">Согласование</MenuItem>
-                <MenuItem value="payment">Оплата</MenuItem>
-                <MenuItem value="delivery">Доставка</MenuItem>
-                <MenuItem value="universal">Универсальная</MenuItem>
+                {TASK_TYPE_OPTIONS.map(option => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -245,7 +240,7 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             />
 
             <FormControl fullWidth>
-              <InputLabel id="deadline-option-label">Дедлайн (опция)</InputLabel>
+              <InputLabel>Дедлайн (опция)</InputLabel>
               <Select
                 labelId="deadline-option-label"
                 id="deadlineOption"
@@ -258,7 +253,6 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
                 <MenuItem value="twoHours">+2 часа</MenuItem>
                 <MenuItem value="today">Сегодня (до 17:30)</MenuItem>
                 <MenuItem value="tomorrow">Завтра (до 17:30)</MenuItem>
-                <MenuItem value="thisWeek">Эта неделя (до пятницы 17:00)</MenuItem>
                 <MenuItem value="manual">В ручную (выбрать дату и время)</MenuItem>
               </Select>
             </FormControl>
@@ -370,22 +364,10 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span><strong>Название:</strong> {taskData.title}</span>
-                <span><strong>Тип:</strong> {
-                  {
-                    'approval': 'Согласование',
-                    'payment': 'Оплата',
-                    'delivery': 'Доставка',
-                    'universal': 'Универсальная'
-                  }[taskData.task_type]
-                }</span>
+                <span><strong>Тип:</strong> {TASK_TYPE_LABELS[taskData.task_type] || taskData.task_type}</span>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span><strong>Приоритет:</strong> {
-                  {
-                    'low': 'Стандартный',
-                    'high': 'Высокий'
-                  }[taskData.priority]
-                }</span>
+                <span><strong>Приоритет:</strong> {PRIORITY_LABELS[taskData.priority] || taskData.priority}</span>
                 <span><strong>Дедлайн:</strong> {new Date(taskData.deadline).toLocaleString('ru-RU')}</span>
               </Box>
               <Box>

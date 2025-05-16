@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useContext, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
@@ -15,7 +15,95 @@ import TaskDetailPage from './pages/TaskDetailPage';
 import UserAuthModal from './components/UserAuthModal';
 
 const AppContent = () => {
-  const { user, logout, error } = useAuth();
+  const { user, logout, error, isAuthenticated, loading: isLoadingAuth } = useAuth();
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    if (isLoadingAuth) {
+      console.log('Authentication is loading, WebSocket connection deferred.');
+      if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
+        socketRef.current.close();
+        console.log('Closed WebSocket because authentication is in progress.');
+      }
+      socketRef.current = null;
+      return;
+    }
+
+    if (isAuthenticated && user) {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = 'localhost:8000';
+      const socketUrl = `${wsProtocol}//${wsHost}/ws/notifications/`;
+
+      console.log(`Attempting to connect to WebSocket at: ${socketUrl} for user ${user?.id || 'unknown'} (Auth loaded)`);
+
+      if (socketRef.current) {
+        if (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING) {
+          socketRef.current.close();
+          console.log('Previous WebSocket connection (if any) closed before creating a new one.');
+        }
+      }
+
+      const newSocket = new WebSocket(socketUrl);
+      socketRef.current = newSocket;
+
+      newSocket.onopen = () => {
+        console.log('WebSocket connection established (frontend)');
+      };
+
+      newSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Message from server (frontend):', data);
+        if (data.type === 'connection_established') {
+          console.log(`WebSocket says: ${data.message}`);
+        } else if (data.type === 'notification') {
+          console.log('Received legacy notification (frontend):', data.payload);
+        } else if (data.type === 'data_update') {
+          console.log('Received data update (frontend):', data.data);
+        }
+      };
+
+      newSocket.onclose = (event) => {
+        console.log('WebSocket connection closed (frontend):', event);
+        if (socketRef.current === newSocket) {
+          socketRef.current = null;
+        }
+      };
+
+      newSocket.onerror = (error) => {
+        console.error('WebSocket error (frontend):', error);
+        if (socketRef.current === newSocket) {
+          socketRef.current = null;
+        }
+      };
+
+      return () => {
+        if (newSocket.readyState === WebSocket.OPEN || newSocket.readyState === WebSocket.CONNECTING) {
+          newSocket.close();
+          console.log('WebSocket connection (created by this effect) closed on component unmount/re-render or dependency change.');
+        }
+        if (socketRef.current === newSocket) {
+          socketRef.current = null;
+        }
+      };
+    } else {
+      console.log('User not authenticated or user data not available (Auth loaded), ensuring WebSocket is closed.');
+      if (socketRef.current) {
+        if (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING) {
+          socketRef.current.close();
+          console.log('Closed WebSocket from ref because user is not authenticated after auth load.');
+        }
+        socketRef.current = null;
+      }
+    }
+  }, [isAuthenticated, user, isLoadingAuth]);
+
+  if (isLoadingAuth) {
+    return (
+      <div className="h-screen flex justify-center items-center">
+        <p className="text-xl">Загрузка аутентификации...</p>
+      </div>
+    );
+  }
 
   if (error) {
     return <ErrorDisplay error={error} />;
