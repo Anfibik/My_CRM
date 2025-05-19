@@ -20,7 +20,7 @@ export const getStatusLabel = (status) => {
 export const STATUS_COLORS_MAP = { 
     not_accepted: 'error.main',
     pending: 'warning.main',
-    accepted: 'info.main',
+    accepted: 'secondary.main', // Изменено на secondary.main для фиолетового цвета
     in_progress: 'primary.main',
     completed: 'success.main',
     closed: 'text.secondary', 
