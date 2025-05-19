@@ -94,73 +94,100 @@ const MyTasksKanbanPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{
-      flexGrow: 1,       // <--- ИЗМЕНЕНИЕ: Занять доступное пространство как flex-элемент
-      minHeight: 0,      // <--- ДОБАВЛЕНО: Важно для корректного сжатия flex-элементов
+      height: '100%', // Занимаем всю высоту, предоставленную родительским контейнером из App.js
       display: 'flex',
-      flexDirection: 'column'
-      // Отступы mt, mb были убраны, так как управляются p:2 родителя в App.js
+      flexDirection: 'column',
     }}>
-      {/* Заголовок H1 был удален пользователем */}
-      <Box // Columns Gutter (container for all columns)
-        sx={{
-          height: '100%', // Оставляем, чтобы взять высоту родительского Container
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'stretch', // Колонки растягиваются на высоту этого Box
-          overflowX: 'auto',   // Horizontal scroll for columns themselves
-          gap: 2,
-          p: 1,                // Padding for the gutter around columns
-        }}
-      >
+      <Box sx={{
+        display: 'flex',
+        overflowX: 'auto', // Горизонтальный скролл для колонок
+        overflowY: 'hidden', // Запрещаем вертикальный скролл здесь, он будет внутри колонок
+        flexGrow: 1,         // Занимает все доступное вертикальное пространство
+        p: 1,
+        gap: 2,
+        alignItems: 'stretch', // Важно, чтобы колонки растягивались по высоте родителя
+        minHeight: 0,  // Новое: важно для корректного расчёта flex-элементов
+      }}>
         {COLUMN_ORDER.map((statusKey) => (
-          <Paper // Each Kanban Column
+          <Paper
             key={statusKey}
             elevation={3}
             sx={{
-              width: '210px',     // Adjusted width for cards of 172px + padding
-              minHeight: 0,        // ВАЖНО: для корректной работы flex/overflow у дочерних
+              width: '200px', // Чуть шире, чтобы убрать возможный гор. скролл
+              flexShrink: 0,
+              height: '100%',      // Явно занять всю высоту родителя
               display: 'flex',
               flexDirection: 'column',
-              backgroundColor: 'grey.100',
+              overflow: 'hidden',  // Paper сама не скроллится
             }}
           >
-            <Box /* Column Header */
-              sx={{ 
-                p: 1.5,             // Padding for the header text
-                pb: 1,              // Slightly less padding bottom for header
-                textAlign: 'center',
-                borderRadius: '4px 4px 0 0', // Rounded corners only at the top
-                backgroundColor: getStatusColor(statusKey) || 'primary.main',
-                color: (getStatusColor(statusKey) && (getStatusColor(statusKey).includes('warning') || getStatusColor(statusKey).includes('info'))) ? 'common.black' : 'common.white',
-                boxShadow: 1,
-                flexShrink: 0,      // Header should not shrink
-              }}
-            >
+            {/* Column Header - Direct child of Paper */}
+            <Box sx={{
+              p: 1.5,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              flexShrink: 0, // Header does not shrink
+              backgroundColor: (() => {
+                const color = getStatusColor(statusKey);
+                // Если getStatusColor вернул объект с полем headerBg, используем его
+                if (color && typeof color === 'object' && color.headerBg) 
+                  return color.headerBg;
+                // Если getStatusColor вернул объект с полем bg, используем его  
+                if (color && typeof color === 'object' && color.bg) 
+                  return color.bg;
+                // Если getStatusColor вернул строку (цвет), используем её
+                if (typeof color === 'string') 
+                  return color;
+                // Фолбэк в зависимости от статуса  
+                switch (statusKey) {
+                  case 'not_accepted': return '#d32f2f'; // красный для "Не принята"
+                  case 'pending': return '#ed6c02'; // оранжевый для "В ожидании"
+                  case 'accepted': return '#0288d1'; // синий для "Принята"
+                  case 'in_progress': return '#2e7d32'; // зеленый для "В работе"
+                  case 'completed': return '#2e7d32'; // зеленый для "Выполнена"
+                  default: return 'grey.200';
+                }
+              })(),
+              // Аналогично для цвета текста
+              color: (() => {
+                const color = getStatusColor(statusKey);
+                if (color && typeof color === 'object' && color.textColor) 
+                  return color.textColor;
+                
+                // Для темных фонов - белый текст, для светлых - черный
+                const bgColor = getStatusColor(statusKey);
+                if (typeof bgColor === 'string' && 
+                   (bgColor.includes('warning') || bgColor.includes('info')))
+                  return 'common.black';
+                return 'common.white';
+              })(),
+            }}>
               <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
                 {getStatusLabel(statusKey)} ({tasksByStatus[statusKey]?.length || 0})
               </Typography>
             </Box>
-            <Box /* Cards Scrollable Area */
-              sx={{
-                flexGrow: 1,          // Takes up remaining space in the Paper column
-                minHeight: 0,         // Crucial for flex children with overflow
-                overflowY: 'auto',
-                p: 1.5,               // Padding around the list of cards
+
+            {/* Scrollable Area for Cards - Direct child of Paper, after header */}
+            <Box sx={{
+              flexGrow: 1,    // Takes all available vertical space after header
+              minHeight: 0,   // Necessary for flexGrow in a flex column
+              overflowY: 'auto', // This is where the scrollbar will appear
+            }}>
+              {/* Inner Box for card list styling (padding, gap) */}
+              <Box sx={{
+                p: 1.5,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1.5,
-              }}
-            >
-              {tasksByStatus[statusKey] && tasksByStatus[statusKey].length > 0 ? (
-                tasksByStatus[statusKey].map(task => (
-                  <TaskCard key={task.id} task={task} />
-                ))
-              ) : (
-                <Typography variant="body2" sx={{ textAlign: 'center', color: 'text.secondary', mt: 2 }}>
-                  Нет задач
-                </Typography>
-              )}
+              }}>
+                {tasksByStatus[statusKey] && tasksByStatus[statusKey].length > 0 ? (
+                  tasksByStatus[statusKey].map(task => (
+                    <TaskCard key={task.id} task={task} />
+                  ))
+                ) : (
+                  <Typography sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>Нет задач</Typography>
+                )}
+              </Box>
             </Box>
           </Paper>
         ))}

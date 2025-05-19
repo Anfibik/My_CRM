@@ -171,12 +171,12 @@ const AppContent = () => {
         height: 'calc(100vh - 40px)', // Высота за вычетом нав. панели
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden' // Предотвратить двойной скролл на уровне App
+        overflowY: 'auto' // Позволить скролл на уровне всего контента страницы, если он превышает доступную высоту
       }}>
         <Box sx={{ 
           p: 2, // Сохраняем отступы, которые были у div className="p-2"
           flexGrow: 1, 
-          overflow: 'hidden',   // Заставляем этот контейнер обрезать контент, если он выходит за пределы
+          overflowY: 'auto',   // Позволяем вертикальный скролл, если контент не помещается
           display: 'flex',      // Чтобы TasksKanbanPage (если это flex) мог растянуться
           flexDirection: 'column' // Чтобы TasksKanbanPage (если это flex) мог растянуться
         }}>
