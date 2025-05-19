@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Box, Typography, CircularProgress, Alert, Grid, Paper, Container } from '@mui/material';
-import TaskCard from '../components/tasks/TaskCard';
 import { STATUS_LABELS } from '../constants'; 
 import { getStatusLabel, getStatusColor } from '../utils/taskUtils'; 
+import TaskCard from '../components/tasks/TaskCard';
 
 const COLUMN_ORDER = [
   'not_accepted',
@@ -13,6 +13,60 @@ const COLUMN_ORDER = [
   'completed',
   'closed',
 ];
+
+const getColumnHeaderStyling = (statusKey) => {
+  const colorInfo = getStatusColor(statusKey); // Вызываем один раз
+
+  let backgroundColor = 'grey.200'; // Дефолтный фон
+  let textColor = 'common.black';   // Дефолтный цвет текста (изменил на черный для лучшей читаемости на grey.200)
+
+  if (colorInfo && typeof colorInfo === 'object') {
+    backgroundColor = colorInfo.headerBg || colorInfo.bg || backgroundColor;
+    textColor = colorInfo.textColor; // Если есть textColor, используем его
+
+    // Если textColor не задан явно, пытаемся определить его на основе фона
+    if (!textColor) {
+      if (backgroundColor.includes('warning') || backgroundColor.includes('info') || backgroundColor === 'grey.200' || backgroundColor === 'grey.100') {
+        textColor = 'common.black';
+      } else {
+        textColor = 'common.white'; // Для большинства других цветных фонов
+      }
+    }
+  } else if (typeof colorInfo === 'string') {
+    backgroundColor = colorInfo;
+    // Определяем цвет текста на основе строкового значения фона
+    if (backgroundColor.includes('warning') || backgroundColor.includes('info') || backgroundColor.includes('grey')) {
+      textColor = 'common.black';
+    } else {
+      textColor = 'common.white';
+    }
+  } else {
+    // Фолбэк switch по statusKey, если getStatusColor ничего не вернул или вернул не то
+    switch (statusKey) {
+      case 'not_accepted':
+        backgroundColor = '#d32f2f'; // красный
+        textColor = 'common.white';
+        break;
+      case 'pending':
+        backgroundColor = '#ed6c02'; // оранжевый
+        textColor = 'common.white';
+        break;
+      case 'accepted':
+        backgroundColor = '#0288d1'; // синий
+        textColor = 'common.white';
+        break;
+      case 'in_progress':
+      case 'completed':
+        backgroundColor = '#2e7d32'; // зеленый
+        textColor = 'common.white';
+        break;
+      default:
+        // backgroundColor уже 'grey.200', textColor 'common.black'
+        break;
+    }
+  }
+  return { backgroundColor, color: textColor };
+};
 
 const MyTasksKanbanPage = () => {
   const [tasksByStatus, setTasksByStatus] = useState({});
@@ -127,40 +181,7 @@ const MyTasksKanbanPage = () => {
               borderBottom: '1px solid',
               borderColor: 'divider',
               flexShrink: 0, // Header does not shrink
-              backgroundColor: (() => {
-                const color = getStatusColor(statusKey);
-                // Если getStatusColor вернул объект с полем headerBg, используем его
-                if (color && typeof color === 'object' && color.headerBg) 
-                  return color.headerBg;
-                // Если getStatusColor вернул объект с полем bg, используем его  
-                if (color && typeof color === 'object' && color.bg) 
-                  return color.bg;
-                // Если getStatusColor вернул строку (цвет), используем её
-                if (typeof color === 'string') 
-                  return color;
-                // Фолбэк в зависимости от статуса  
-                switch (statusKey) {
-                  case 'not_accepted': return '#d32f2f'; // красный для "Не принята"
-                  case 'pending': return '#ed6c02'; // оранжевый для "В ожидании"
-                  case 'accepted': return '#0288d1'; // синий для "Принята"
-                  case 'in_progress': return '#2e7d32'; // зеленый для "В работе"
-                  case 'completed': return '#2e7d32'; // зеленый для "Выполнена"
-                  default: return 'grey.200';
-                }
-              })(),
-              // Аналогично для цвета текста
-              color: (() => {
-                const color = getStatusColor(statusKey);
-                if (color && typeof color === 'object' && color.textColor) 
-                  return color.textColor;
-                
-                // Для темных фонов - белый текст, для светлых - черный
-                const bgColor = getStatusColor(statusKey);
-                if (typeof bgColor === 'string' && 
-                   (bgColor.includes('warning') || bgColor.includes('info')))
-                  return 'common.black';
-                return 'common.white';
-              })(),
+              ...getColumnHeaderStyling(statusKey),
             }}>
               <Typography variant="h6" component="div" sx={{ fontSize: '1rem' }}>
                 {getStatusLabel(statusKey)} ({tasksByStatus[statusKey]?.length || 0})
@@ -172,6 +193,12 @@ const MyTasksKanbanPage = () => {
               flexGrow: 1,    // Takes all available vertical space after header
               minHeight: 0,   // Necessary for flexGrow in a flex column
               overflowY: 'auto', // This is where the scrollbar will appear
+              // Стили для скрытия стандартного скроллбара
+              '&::-webkit-scrollbar': {
+                display: 'none', // Chrome, Safari, Edge
+              },
+              '-ms-overflow-style': 'none', // IE
+              'scrollbar-width': 'none', // Firefox
             }}>
               {/* Inner Box for card list styling (padding, gap) */}
               <Box sx={{
