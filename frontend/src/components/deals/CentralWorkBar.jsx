@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Box, Divider } from '@mui/material';
-import TasksArea from './TasksArea';
+import TasksArea from '../tasks/TasksArea';
 
 const CentralWorkBar = ({
   deal,

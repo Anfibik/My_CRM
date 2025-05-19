@@ -6,7 +6,7 @@ export const login = async (credentials) => {
   try {
     const response = await api.post(`${AUTH_ENDPOINT}/login`, credentials);
     const { token, user } = response.data;
-    localStorage.setItem('token', token);
+    localStorage.setItem('authToken', token);
     return { token, user };
   } catch (error) {
     console.error('Ошибка при входе:', error);
@@ -18,7 +18,7 @@ export const register = async (userData) => {
   try {
     const response = await api.post(`${AUTH_ENDPOINT}/register`, userData);
     const { token, user } = response.data;
-    localStorage.setItem('token', token);
+    localStorage.setItem('authToken', token);
     return { token, user };
   } catch (error) {
     console.error('Ошибка при регистрации:', error);
@@ -28,7 +28,7 @@ export const register = async (userData) => {
 
 export const logout = () => {
   try {
-    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
   } catch (error) {
     console.error('Ошибка при выходе:', error);
   }
@@ -38,7 +38,7 @@ export const refreshToken = async () => {
   try {
     const response = await api.post(`${AUTH_ENDPOINT}/refresh`);
     const { token } = response.data;
-    localStorage.setItem('token', token);
+    localStorage.setItem('authToken', token);
     return token;
   } catch (error) {
     console.error('Ошибка при обновлении токена:', error);

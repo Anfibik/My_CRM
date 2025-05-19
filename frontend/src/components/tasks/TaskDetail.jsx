@@ -7,7 +7,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Autocomplete,
   Checkbox, useTheme // Добавляем useTheme
 } from '@mui/material';
-import axios from 'axios';
+import api from '../../api/config.js'; // Импортируем наш экземпляр api
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -20,9 +20,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import WarningIcon from '@mui/icons-material/Warning';
 import CancelIcon from '@mui/icons-material/Cancel';
-
-// Настройка axios для авторизации
-axios.defaults.withCredentials = true;
+import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Исправленный путь
 
 const TaskDetail = () => {
   const theme = useTheme(); // Вызываем хук useTheme в начале компонента
@@ -53,7 +51,7 @@ const TaskDetail = () => {
     const fetchTask = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/tasks/${id}/`, { withCredentials: true });
+        const response = await api.get(`/api/tasks/${id}/`);
         setTask(response.data);
         setError(null);
       } catch (err) {
@@ -71,7 +69,7 @@ const TaskDetail = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get('/api/users/', { withCredentials: true });
+        const response = await api.get('/api/users/');
         setAvailableUsers(response.data);
       } catch (err) {
         console.error('Ошибка при загрузке пользователей:', err);
@@ -87,10 +85,10 @@ const TaskDetail = () => {
 
     try {
       setSubmittingComment(true);
-      const response = await axios.post('/api/task-discussions/', {
+      const response = await api.post('/api/task-discussions/', {
         task: id,
         content: newComment,
-      }, { withCredentials: true });
+      });
 
       // Добавляем новый комментарий к списку без перезагрузки всей задачи
       setTask(prev => ({
@@ -109,14 +107,10 @@ const TaskDetail = () => {
   const handleChangeStatus = async (newStatus) => {
     try {
       setChangingStatus(true);
-      const response = await axios.patch(`/api/tasks/${id}/`, {
+      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
         status: newStatus
-      }, { withCredentials: true });
-
-      setTask(prev => ({
-        ...prev,
-        status: response.data.status
-      }));
+      });
+      setTask(prevTask => ({ ...prevTask, status: response.data.status, status_changed_at: response.data.status_changed_at }));
     } catch (err) {
       console.error('Ошибка при изменении статуса:', err);
     } finally {
@@ -144,7 +138,7 @@ const TaskDetail = () => {
     if (availableUsers.length === 0) {
       const fetchUsers = async () => {
         try {
-          const response = await axios.get('/api/users/', { withCredentials: true });
+          const response = await api.get('/api/users/');
           setAvailableUsers(response.data);
         } catch (err) {
           console.error('Ошибка при загрузке пользователей:', err);
@@ -167,7 +161,7 @@ const TaskDetail = () => {
     if (availableUsers.length === 0) {
       const fetchUsers = async () => {
         try {
-          const response = await axios.get('/api/users/', { withCredentials: true });
+          const response = await api.get('/api/users/');
           setAvailableUsers(response.data);
         } catch (err) {
           console.error('Ошибка при загрузке пользователей:', err);
@@ -183,15 +177,13 @@ const TaskDetail = () => {
 
   // Функции для сохранения изменений в участниках и наблюдателях
   const handleSaveParticipants = async () => {
+    setIsUpdatingParticipants(true);
     try {
-      setIsUpdatingParticipants(true);
-      const response = await axios.patch(`/api/tasks/${id}/`, {
+      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
         participants: selectedParticipants
-      }, { withCredentials: true });
-
-      // Обновляем данные задачи в состоянии
-      setTask(prev => ({
-        ...prev,
+      });
+      setTask(prevTask => ({ 
+        ...prevTask,
         participants: response.data.participants,
         participants_details: response.data.participants_details || []
       }));
@@ -205,15 +197,13 @@ const TaskDetail = () => {
   };
 
   const handleSaveObservers = async () => {
+    setIsUpdatingObservers(true);
     try {
-      setIsUpdatingObservers(true);
-      const response = await axios.patch(`/api/tasks/${id}/`, {
+      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
         observers: selectedObservers
-      }, { withCredentials: true });
-
-      // Обновляем данные задачи в состоянии
-      setTask(prev => ({
-        ...prev,
+      });
+      setTask(prevTask => ({ 
+        ...prevTask,
         observers: response.data.observers,
         observers_details: response.data.observers_details || []
       }));
@@ -227,32 +217,36 @@ const TaskDetail = () => {
   };
 
   // Функция для удаления участника напрямую из детали задачи
-  const removeParticipant = async (userId) => {
+  const removeParticipant = async (userIdToRemove) => {
+    setIsUpdatingParticipants(true);
     try {
-      const newParticipants = (task.participants || []).filter(id => id !== userId);
-      const response = await axios.patch(`/api/tasks/${id}/`, { participants: newParticipants }, { withCredentials: true });
-      setTask(prev => ({
-        ...prev,
-        participants: response.data.participants,
-        participants_details: response.data.participants_details || (prev.participants_details || []).filter(u => u.id !== userId)
-      }));
+      // Формируем новый список ID участников без удаляемого
+      const newParticipantIds = (task.participants || []).filter(id => id !== userIdToRemove);
+      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
+        participants: newParticipantIds, // Отправляем обновленный список ID
+      });
+      setTask(response.data); // Обновляем задачу данными с сервера
     } catch (err) {
       console.error('Ошибка при удалении участника:', err);
+    } finally {
+      setIsUpdatingParticipants(false);
     }
   };
 
   // Функция для удаления наблюдателя напрямую
-  const removeObserver = async (userId) => {
+  const removeObserver = async (userIdToRemove) => {
+    setIsUpdatingObservers(true);
     try {
-      const newObservers = (task.observers || []).filter(id => id !== userId);
-      const response = await axios.patch(`/api/tasks/${id}/`, { observers: newObservers }, { withCredentials: true });
-      setTask(prev => ({
-        ...prev,
-        observers: response.data.observers,
-        observers_details: response.data.observers_details || (prev.observers_details || []).filter(u => u.id !== userId)
-      }));
+      // Формируем новый список ID наблюдателей без удаляемого
+      const newObserverIds = (task.observers || []).filter(id => id !== userIdToRemove);
+      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
+        observers: newObserverIds, // Отправляем обновленный список ID
+      });
+      setTask(response.data); // Обновляем задачу данными с сервера
     } catch (err) {
       console.error('Ошибка при удалении наблюдателя:', err);
+    } finally {
+      setIsUpdatingObservers(false);
     }
   };
 
@@ -266,63 +260,6 @@ const TaskDetail = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-
-  const calculateTimeRemaining = (deadlineString) => {
-    if (!deadlineString) return { text: '—', status: 'normal', icon: 'calendar' };
-
-    const now = new Date();
-    const deadline = new Date(deadlineString);
-    
-    // Если дедлайн уже прошел
-    if (deadline < now) {
-      return {
-        text: 'Просрочено',
-        status: 'critical',
-        icon: 'warning'
-      };
-    }
-    
-    // Расчет оставшихся рабочих часов
-    let remainingHours = 0;
-    let currentDate = new Date(now);
-    
-    // Приводим текущее время к началу следующего часа
-    currentDate.setMinutes(0, 0, 0);
-    currentDate.setHours(currentDate.getHours() + 1);
-    
-    while (currentDate <= deadline) {
-      const dayOfWeek = currentDate.getDay();
-      const hours = currentDate.getHours();
-      
-      // Проверяем, является ли день рабочим (1-5 = понедельник-пятница) и является ли время рабочим (9-17 = 9:00-18:00)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6 && hours >= 9 && hours < 18) {
-        remainingHours++;
-      }
-      
-      // Переходим к следующему часу
-      currentDate.setHours(currentDate.getHours() + 1);
-    }
-    
-    // Определяем статус и иконку в зависимости от оставшегося времени
-    let status, icon;
-    
-    if (remainingHours <= 2) {
-      status = 'critical'; // красный
-      icon = 'warning';
-    } else if (remainingHours <= 10) {
-      status = 'warning'; // оранжевый
-      icon = 'time';
-    } else {
-      status = 'normal'; // стандартный серый
-      icon = 'calendar';
-    }
-    
-    return {
-      text: `Осталось ${remainingHours} ч`,
-      status,
-      icon
-    };
   };
 
   const getStatusLabel = (status) => {
@@ -532,42 +469,33 @@ const TaskDetail = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
                     ОСТАЛОСЬ:
                   </Typography>
-                  {task?.deadline ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {(() => {
-                        const timeInfo = calculateTimeRemaining(task.deadline);
-                        
-                        // Определяем цвет и вес текста в зависимости от статуса
-                        let color, fontWeight;
-                        
-                        switch (timeInfo.status) {
-                          case 'critical': // менее 2 часов
-                            color = 'error.main';
-                            fontWeight = 'bold';
-                            break;
-                          case 'warning': // от 2 до 10 часов
-                            color = 'warning.main';
-                            fontWeight = 'medium';
-                            break;
-                          default: // более 10 часов
-                            color = 'text.secondary';
-                            fontWeight = 'regular';
-                        }
-                        
-                        return (
-                          <Typography
-                            variant="body2"
-                            fontWeight={fontWeight}
-                            color={color}
-                          >
-                            {timeInfo.text}
-                          </Typography>
-                        );
-                      })()} 
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">—</Typography>
-                  )}
+                  {(() => {
+                    const deadlineInfo = getDeadlineInfo(task?.deadline);
+
+                    if (!task?.deadline) {
+                      return <Typography variant="body2" color={deadlineInfo.color}>—</Typography>;
+                    }
+
+                    let fontWeight;
+                    // Сравниваем со значениями из theme, если они доступны, иначе с текстовыми строками
+                    if (deadlineInfo.color === (theme?.palette?.error?.main || 'error.main')) {
+                      fontWeight = 'bold';
+                    } else if (deadlineInfo.color === (theme?.palette?.warning?.main || 'warning.main')) {
+                      fontWeight = 'medium';
+                    } else {
+                      fontWeight = 'regular';
+                    }
+                    
+                    return (
+                      <Typography
+                        variant="body2"
+                        fontWeight={fontWeight}
+                        color={deadlineInfo.color}
+                      >
+                        {deadlineInfo.text}
+                      </Typography>
+                    );
+                  })()} 
                 </Box>
               </Box>
             </Box>
@@ -581,32 +509,24 @@ const TaskDetail = () => {
             justifyContent: 'center', 
             alignItems: 'center' 
           }}>
-            {task?.deadline ? (
-              (() => {
-                const timeInfo = calculateTimeRemaining(task.deadline);
-                
-                // Выбор иконки в зависимости от статуса
-                let icon, color;
-                
-                switch (timeInfo.status) {
-                  case 'critical': // менее 2 часов
-                    icon = <WarningIcon sx={{ fontSize: '2rem' }} />;
-                    color = 'error.main';
-                    break;
-                  case 'warning': // от 2 до 10 часов
-                    icon = <AccessTimeIcon sx={{ fontSize: '2rem' }} />;
-                    color = 'warning.main';
-                    break;
-                  default: // более 10 часов
-                    icon = <CalendarTodayIcon sx={{ fontSize: '2rem' }} />;
-                    color = 'text.secondary';
-                }
-                
-                return React.cloneElement(icon, { sx: { ...icon.props.sx, color } });
-              })()
-            ) : (
-              <CalendarTodayIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
-            )}
+            {(() => {
+              const deadlineInfo = getDeadlineInfo(task?.deadline); 
+              let iconElement;
+
+              switch (deadlineInfo.iconName) {
+                case 'Warning':
+                  iconElement = <WarningIcon sx={{ fontSize: '2rem' }} />;
+                  break;
+                case 'AccessTime':
+                  iconElement = <AccessTimeIcon sx={{ fontSize: '2rem' }} />;
+                  break;
+                case 'CalendarToday':
+                default:
+                  iconElement = <CalendarTodayIcon sx={{ fontSize: '2rem' }} />;
+                  break;
+              }
+              return React.cloneElement(iconElement, { sx: { ...iconElement.props.sx, color: deadlineInfo.color } });
+            })()}
           </Box>
 
           {/* Центральный блок (70%) - название и идентификатор */}
@@ -1107,11 +1027,26 @@ const TaskDetail = () => {
                       size="small"
                       deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
                       onDelete={(e) => { e.stopPropagation(); removeObserver(observer.id); }}
-                      sx={{ 
+                      sx={{
+                        width: 'calc(50% - 2px)', 
+                        margin: '1px',             
+                        boxSizing: 'border-box',
                         bgcolor: 'grey.300',
                         color: 'grey.800',
-                        fontSize: '0.65rem', 
-                        height: 24
+                        fontSize: '0.65rem',
+                        height: 24,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        '& .MuiChip-label': {
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          minWidth: 0, 
+                          flexGrow: 1, 
+                        },
+                        '& .MuiChip-deleteIcon': {
+                          flexShrink: 0, 
+                        }
                       }}
                     />
                   </Tooltip>

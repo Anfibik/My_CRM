@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getCompanies, createCompany, updateCompany, deleteCompany } from '../api/companies';
-import ErrorDisplay from '../components/ErrorDisplay';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 
 const CompanyContext = createContext(null);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, Typography, Divider, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField, Chip, Tabs, Tab } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import { DEPARTMENT_LABELS } from '../../constants';
 
 const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, onUpdateParticipants, selectedAccount, onAccountChange, onUpdateAccount }) => {
   const lead = deal.lead || {};
@@ -20,28 +21,15 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
     color: 'text.primary'
   };
 
-  // Маппинг русской метки отдела в технический код
-  const labelToCode = {
-    "ШМБ": "warehouses",
-    "Стеллажные системы": "racks",
-    "Складская техника": "warehouses_machines",
-    "Пластиковая тара": "plastic_containers",
-    "Мусорные баки": "trash_bins",
-    "Системы сортировки": "sorting_systems",
-    "Автоматизация": "automation",
-    "Сервисные услуги": "services",
-    "Администрация": "administrations",
-    "Логистика": "logistics",
-    "Финансы и бухгалтерия": "finance",
-    "Маркетинг": "marketing"
+  // Function to get department code by its label from DEPARTMENT_LABELS
+  const getDeptCodeByLabel = (label) => {
+    if (!label) return null;
+    return Object.keys(DEPARTMENT_LABELS).find(key => DEPARTMENT_LABELS[key] === label);
   };
 
-  const codeToLabel = Object.fromEntries(
-    Object.entries(labelToCode).map(([label, code]) => [code, label])
-  );
-
   // Преобразовать метку в код для фильтрации
-  const deptCode = labelToCode[deal.department] || deal.department;
+  // deal.department is expected to be a label like "ШМБ"
+  const deptCode = getDeptCodeByLabel(deal.department) || deal.department; // Fallback to deal.department if no code found (e.g. it's already a code)
 
   const [openAccDialog, setOpenAccDialog] = useState(false);
   const [localAccount, setLocalAccount] = useState(selectedAccount);
@@ -150,7 +138,7 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
             value={activeNeedTab}
             onChange={(e, v) => setActiveNeedTab(v)}
             variant="fullWidth"
-            sx={{ minHeight: '25px' }}
+            sx={{ minHeight: '30px' }}
           >
             <Tab label="Обращение" value="request" sx={{ fontSize: '0.65rem', minHeight: '24px', py: 0 }} />
             <Tab label="Потребность" value="validated" sx={{ fontSize: '0.65rem', minHeight: '24px', py: 0 }} />
@@ -159,16 +147,16 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         {/* Контент вкладки */}
         <Box sx={{
           backgroundColor: 'grey.200',
-          borderRadius: 2,
-          p: '6px',
+          borderRadius: 0,
+          p: '4px',
           mb: 1,
           width: '100%',
-          height: '6.0em',
+          height: '7.0em',
           overflowY: 'auto',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
         }}>
-          <Typography variant="body2" color="textPrimary">
+          <Typography variant="body2" color="textPrimary" sx={{ fontSize: '0.75rem' }}>
             {activeNeedTab === 'request' ? (lead.need) : (deal.validated_need)}
           </Typography>
         </Box>
@@ -337,9 +325,9 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         </Typography>
         <Box component="ul" sx={{ m: 0, p: 0, pl: 2, mb: 1, listStyleType: 'none', fontSize: '0.85rem' }}>
           {deal.lead.department_assignments && Object.keys(deal.lead.department_assignments).length > 0 ? (
-            Object.entries(deal.lead.department_assignments).map(([deptCode, managerId], i) => (
+            Object.entries(deal.lead.department_assignments).map(([assignedDeptCode, managerId], i) => (
               <Box component="li" key={i} sx={{ mb: 0.5 }}>
-                {codeToLabel[deptCode] || deptCode} ({users.find(u => u.id === Number(managerId))?.full_name || '—'})
+                {DEPARTMENT_LABELS[assignedDeptCode] || assignedDeptCode} ({users.find(u => u.id === Number(managerId))?.full_name || '—'})
               </Box>
             ))
           ) : (

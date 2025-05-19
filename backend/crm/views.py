@@ -319,6 +319,48 @@ API для управления задачами. Поддерживает CRUD-
             )
 
 
+class UserKanbanTasksView(generics.ListAPIView):
+    """
+    API view to get tasks for the user's Kanban board.
+    Filters tasks based on user role (owner/top_manager see all)
+    or user involvement (author, executor, participant, observer).
+    """
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated, NotCallOperator]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in ('owner', 'top_manager'):
+            return Task.objects.all().order_by('-created_at') # Show newest first for admins
+        
+        user_tasks_filter = (
+            Q(author=user) |
+            Q(executor=user) |
+            Q(participants=user) |
+            Q(observers=user)
+        )
+        return Task.objects.filter(user_tasks_filter).distinct().order_by('status', '-priority', 'deadline', 'created_at')
+
+
+class MyKanbanTasksView(generics.ListAPIView):
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Оптимизируем запросы к связанным моделям
+        # Сортировку по умолчанию лучше убрать отсюда, чтобы ее можно было переопределить в сериализаторе или на фронте
+        base_queryset = Task.objects.select_related('author', 'executor', 'deal').prefetch_related('participants', 'observers')
+
+        if hasattr(user, 'role') and user.role in ['owner', 'top_manager']:
+            return base_queryset.all().order_by('-created_at') # Сортировка здесь добавлена для примера
+        else:
+            # Фильтр для обычных пользователей: задачи, где они автор, исполнитель, участник или наблюдатель
+            query_filter = Q(author=user) | Q(executor=user) | Q(participants=user) | Q(observers=user)
+            return base_queryset.filter(query_filter).distinct().order_by('-created_at')
+
+
 class TaskDiscussionViewSet(viewsets.ModelViewSet):
     """
     API для управления обсуждениями задач.  

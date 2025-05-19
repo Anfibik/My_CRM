@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import ErrorDisplay from './ErrorDisplay';
+import { useAuth } from '../../context/AuthContext';
+import ErrorDisplay from '../common/ErrorDisplay';
 
 // Справочники ролей и департаментов (должны совпадать с backend)
 const ROLE_CHOICES = [

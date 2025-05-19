@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useCompany } from '../context/CompanyContext';
-import ErrorDisplay from '../components/ErrorDisplay';
+import ErrorDisplay from '../components/common/ErrorDisplay';
 
 const CompanyListPage = () => {
   const { companies, loading, error, addCompany, editCompany, removeCompany } = useCompany();

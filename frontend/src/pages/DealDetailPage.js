@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/config';
-import ContractAmountPopup from '../components/ContractAmountPopup';
-import NextStepPopup from '../components/NextStepPopup';
-import DealSidebar from '../components/DealSidebar';
+import ContractAmountPopup from '../components/deals/ContractAmountPopup';
+import NextStepPopup from '../components/deals/NextStepPopup';
+import DealSidebar from '../components/deals/DealSidebar';
 import { getUsers } from '../api/users';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import { Grid, Box, Tabs, Tab, Typography } from '@mui/material';
-import CentralWorkBar from '../components/CentralWorkBar';
-import FileBar from '../components/FileBar';
+import CentralWorkBar from '../components/deals/CentralWorkBar.jsx';
+import FileBar from '../components/common/FileBar';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import DealHistory from '../components/DealHistory';
-import MyEvents from '../components/MyEvents';
-import GeneralFeed from '../components/GeneralFeed';
+import DealHistory from '../components/deals/DealHistory';
+import MyEvents from '../components/common/MyEvents.jsx';
+import GeneralFeed from '../components/common/GeneralFeed';
 
 const DealDetailPage = () => {
   const { id } = useParams();         // Считываем ID сделки из URL

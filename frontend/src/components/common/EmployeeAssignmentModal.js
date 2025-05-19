@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api/config';
+import api from '../../api/config';
+import { DEPARTMENT_LABELS } from '../../constants';
 
 const EmployeeAssignmentModal = ({ isOpen, onClose, departments, onSave }) => {
     // assignments — объект, где ключ: отдел, значение: выбранный сотрудник (ID)
@@ -7,24 +8,17 @@ const EmployeeAssignmentModal = ({ isOpen, onClose, departments, onSave }) => {
     // employeesByDept — объект, где ключ: отдел, значение: массив сотрудников данного отдела
     const [employeesByDept, setEmployeesByDept] = useState({});
 
-    const departmentKeyMap  = {
-        "ШМБ": "warehouses",
-        "Стеллажные системы": "racks",
-        "Складсая техника": "warehouses_machines",
-        "Пластиковая тара": "plastic_containers",
-        "Мусорные баки": "trash_bins",
-        "Системы сортировки": "sorting_systems",
-        "Автоматизация": "automation",
-        "Сервисные услуги": "services",
-    };
-
+    const departmentApiKeysMap = Object.fromEntries(
+        Object.entries(DEPARTMENT_LABELS).map(([key, value]) => [value, key])
+    );
 
     // При открытии модального окна для каждого отдела загружаем сотрудников
     useEffect(() => {
         if (isOpen && departments && departments.length > 0) {
             departments.forEach(dept => {
-                const deptKey = departmentKeyMap[dept];
+                const deptKey = departmentApiKeysMap[dept]; 
                 if (!deptKey) {
+                    console.warn(`Ключ API для отдела "${dept}" не найден.`);
                     setEmployeesByDept(prev => ({ ...prev, [dept]: [] }));
                     return;
                 }

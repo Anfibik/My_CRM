@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import api from '../api/config';
 import { useNavigate, Link } from 'react-router-dom';
-import DealInfoModal from '../components/DealInfoModal';
 
 // Отображение человекопонятных названий статусов сделок
 const statusLabels = {
@@ -18,6 +17,9 @@ const statusLabels = {
   implementation: 'Реализация',
   closing: 'Закрытие сделки',
 };
+
+// Lazy load DealInfoModal
+const DealInfoModal = lazy(() => import('../components/deals/DealInfoModal'));
 
 const DealListPage = () => {
   const [deals, setDeals] = useState([]);
@@ -138,7 +140,9 @@ const DealListPage = () => {
       </div>
       {/* Модальное окно */}
       {showModal && selectedDeal && (
-        <DealInfoModal deal={selectedDeal} onClose={handleCloseModal} />
+        <Suspense fallback={<div>Загрузка информации о сделке...</div>}>
+          <DealInfoModal deal={selectedDeal} onClose={handleCloseModal} />
+        </Suspense>
       )}
     </div>
   );

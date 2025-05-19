@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/config';
-import EmployeeAssignmentModal from '../components/EmployeeAssignmentModal';
-
+import EmployeeAssignmentModal from '../components/common/EmployeeAssignmentModal';
 
 const InquiryListPage = () => {
     const [inquiries, setInquiries] = useState([]);

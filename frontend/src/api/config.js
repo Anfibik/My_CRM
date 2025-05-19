@@ -1,20 +1,51 @@
 import axios from 'axios';
 
+// Функция для получения значения cookie по имени
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      // Начинается ли строка с имени cookie, которое мы ищем?
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
 // Создаем экземпляр axios с базовыми настройками
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000',  // Исправляем порт на 8000
+  baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000',
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000, // 10 секунд таймаут
+  withCredentials: true, // Разрешаем передачу cookie
 });
 
-// Интерцептор для добавления токена авторизации
+// Интерцептор для добавления токена авторизации и CSRF-токена
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Token ${token}`;
+    // Добавляем CSRF-токен, если он есть
+    const csrfToken = getCookie('csrftoken');
+    if (csrfToken) {
+      config.headers['X-CSRFToken'] = csrfToken;
+    }
+
+    // Пытаемся получить JWT токен (access token)
+    const jwtToken = localStorage.getItem('access');
+    if (jwtToken) {
+      config.headers.Authorization = `Bearer ${jwtToken}`;
+    } else {
+      // Если JWT токена нет, пытаемся получить DRF токен
+      const drfAuthToken = localStorage.getItem('authToken');
+      if (drfAuthToken) {
+        config.headers.Authorization = `Token ${drfAuthToken}`;
+      }
     }
     return config;
   },
@@ -33,7 +64,8 @@ api.interceptors.response.use(
       switch (error.response.status) {
         case 401:
           // Неавторизованный доступ
-          localStorage.removeItem('token');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('access');
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
@@ -70,4 +102,4 @@ api.interceptors.response.use(
   }
 );
 
-export default api; 
+export default api;

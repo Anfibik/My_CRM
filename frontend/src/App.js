@@ -1,18 +1,21 @@
-import React, { useEffect, useContext, useRef } from 'react';
+import React, { useEffect, useContext, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
 import { ContactProvider } from './context/ContactContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import ErrorDisplay from './components/ErrorDisplay';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import ErrorDisplay from './components/common/ErrorDisplay';
 import CompanyListPage from './pages/CompanyListPage';
 import ContactListPage from './pages/ContactListPage';
 import LeadListPage from './pages/LeadListPage';
 import DealListPage from './pages/DealListPage';
 import InquiryListPage from './pages/InquiryListPage';
-import DealDetailPage from './pages/DealDetailPage';
 import TaskDetailPage from './pages/TaskDetailPage';
-import UserAuthModal from './components/UserAuthModal';
+import UserAuthModal from './components/auth/UserAuthModal';
+import { Box } from '@mui/material';
+
+const DealDetailPage = lazy(() => import('./pages/DealDetailPage'));
+const TasksKanbanPage = lazy(() => import('./pages/TasksKanbanPage'));
 
 const AppContent = () => {
   const { user, logout, error, isAuthenticated, loading: isLoadingAuth } = useAuth();
@@ -147,6 +150,11 @@ const AppContent = () => {
               Сделки
             </Link>
           </li>
+          <li>
+            <Link to="/my-tasks-kanban" className="text-white hover:text-gray-300">
+              Мои задачи (Канбан)
+            </Link>
+          </li>
         </ul>
         <div className="flex items-center">
           <span className="text-white mr-3">{user.full_name}</span>
@@ -159,72 +167,95 @@ const AppContent = () => {
         </div>
       </nav>
 
-      <div className="p-2">
-        <Routes>
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route
-            path="/companies"
-            element={
-              <ProtectedRoute>
-                <CompanyProvider>
-                  <CompanyListPage />
-                </CompanyProvider>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contacts"
-            element={
-              <ProtectedRoute>
-                <ContactProvider>
-                  <ContactListPage />
-                </ContactProvider>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/leads"
-            element={
-              <ProtectedRoute>
-                <LeadListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/deals"
-            element={
-              <ProtectedRoute>
-                <DealListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/deals/:id"
-            element={
-              <ProtectedRoute>
-                <DealDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tasks/:id"
-            element={
-              <ProtectedRoute>
-                <TaskDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/inquiries"
-            element={
-              <ProtectedRoute>
-                <InquiryListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/companies" replace />} />
-        </Routes>
-      </div>
+      <Box sx={{ 
+        height: 'calc(100vh - 40px)', // Высота за вычетом нав. панели
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden' // Предотвратить двойной скролл на уровне App
+      }}>
+        <Box sx={{ 
+          p: 2, // Сохраняем отступы, которые были у div className="p-2"
+          flexGrow: 1, 
+          overflow: 'hidden',   // Заставляем этот контейнер обрезать контент, если он выходит за пределы
+          display: 'flex',      // Чтобы TasksKanbanPage (если это flex) мог растянуться
+          flexDirection: 'column' // Чтобы TasksKanbanPage (если это flex) мог растянуться
+        }}>
+          <Suspense fallback={<div>Загрузка страницы...</div>}>
+            <Routes>
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route
+                path="/companies"
+                element={
+                  <ProtectedRoute>
+                    <CompanyProvider>
+                      <CompanyListPage />
+                    </CompanyProvider>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/contacts"
+                element={
+                  <ProtectedRoute>
+                    <ContactProvider>
+                      <ContactListPage />
+                    </ContactProvider>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leads"
+                element={
+                  <ProtectedRoute>
+                    <LeadListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/deals"
+                element={
+                  <ProtectedRoute>
+                    <DealListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/deals/:id"
+                element={
+                  <ProtectedRoute>
+                    <DealDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tasks/:id"
+                element={
+                  <ProtectedRoute>
+                    <TaskDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/inquiries"
+                element={
+                  <ProtectedRoute>
+                    <InquiryListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-tasks-kanban"
+                element={
+                  <ProtectedRoute>
+                    <TasksKanbanPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<Navigate to="/companies" replace />} />
+            </Routes>
+          </Suspense>
+        </Box>
+      </Box>
     </BrowserRouter>
   );
 };

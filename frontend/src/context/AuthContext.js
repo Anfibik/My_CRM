@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
 
   const initAuth = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (token) {
         const userData = await getCurrentUser();
         setUser(userData);
@@ -42,7 +42,6 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const { token, user } = await apiLogin(credentials);
-      localStorage.setItem('token', token); // Сохраняем токен после логина
       setUser(user);
       return user;
     } catch (error) {
@@ -67,7 +66,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     apiLogout();
-    localStorage.removeItem('token'); // Удаляем токен при выходе
     setUser(null);
     setError(null);
   };

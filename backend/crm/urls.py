@@ -8,7 +8,8 @@ from .views import (
     NextStepListCreateView, NextStepDetailView,
     UserRegistrationView, UserLoginView, UserProfileView, UserViewSet,
     # Новые представления для задач
-    TaskViewSet, TaskDiscussionViewSet, TaskAttachmentViewSet, TaskChangeLogViewSet
+    TaskViewSet, TaskDiscussionViewSet, TaskAttachmentViewSet, TaskChangeLogViewSet,
+    MyKanbanTasksView,
 )
 
 
@@ -44,6 +45,9 @@ urlpatterns = [
     # Маршруты для событий сделки
     path('deal-events/', DealEventListCreateView.as_view(), name='deal-event-list-create'),
     path('deal-events/<int:pk>/', DealEventDetailView.as_view(), name='deal-event-detail'),
+
+    # Новый маршрут для Канбан-доски задач пользователя
+    path('tasks/my-kanban/', MyKanbanTasksView.as_view(), name='my-kanban-tasks'),
 
     # Маршруты для следующего шага
     path('next-steps/', NextStepListCreateView.as_view(), name='next-step-list-create'),

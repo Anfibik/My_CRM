@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, 
          Select, MenuItem, FormControl, InputLabel, Box, Checkbox, FormControlLabel } from '@mui/material';
-import { TASK_TYPE_LABELS, PRIORITY_LABELS, TASK_TYPE_OPTIONS } from '../constants';
+import { TASK_TYPE_LABELS, PRIORITY_LABELS, TASK_TYPE_OPTIONS } from '../../constants';
 
 // Helper functions
 const formatDateTimeLocal = (date) => {
