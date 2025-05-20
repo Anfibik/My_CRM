@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Tooltip, Divider, Button, CircularProgress } from '@mui/material';
+import { Card, CardContent, Typography, Box, Tooltip, Divider, Button, CircularProgress, Link as MuiLink } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import api from '../../api/config';
 import { getDeadlineInfo } from '../../utils/deadlineUtils.js';
 import { useNavigate } from 'react-router-dom';
@@ -87,10 +88,10 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
       {...(isDraggable ? provided.draggableProps : {})}
       {...(isDraggable ? provided.dragHandleProps : {})}
       sx={{
-        height: '130px',
+        height: '150px',
         width: '170px',
         cursor: isDraggable ? 'grab' : 'pointer',
-        border: task.priority === 'high' ? '4px solid' : 'none',
+        border: task.priority === 'high' ? '3px solid' : 'none',
         borderColor: task.priority === 'high' ? 'error.main' : undefined,
         backgroundColor: 'rgba(237, 237, 237, 0.8)',
         '&:hover': {
@@ -98,8 +99,8 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
         },
         ...draggingStyle,
         ...(isTaskClosed && {
-          opacity: 0.4,
-          backgroundColor: 'gray',
+          opacity: 0.6,
+          backgroundColor: 'rgba(162, 162, 162, 0.83)',
         }),
       }}
       onClick={!isDraggable ? () => navigate(`/tasks/${task.id}`) : undefined}
@@ -246,7 +247,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
         >
           <Box
             sx={{
-              flexBasis: '40%',
+              flexBasis: '45%',
               textAlign: 'left',
               overflow: 'hidden',
               whiteSpace: 'nowrap',
@@ -262,23 +263,23 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
               <Button
                 size="small"
                 variant="outlined"
-                color="primary"
+                color="secondary"
                 onClick={handleAcceptTask}
                 disabled={isAccepting}
                 sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative' }}
               >
-                {isAccepting ? <CircularProgress size={12} sx={{ color: 'primary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Принять'}
+                {isAccepting ? <CircularProgress size={12} sx={{ color: 'secondary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Принять'}
               </Button>
             ) : (
               <Tooltip title={`Создана: ${formatDateTime(task.created_at)}`} placement="bottom-start">
-                <Typography variant="caption" sx={{ fontSize: 'inherit' }}>
+                <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
                   {formatDateTime(task.created_at)}
                 </Typography>
               </Tooltip>
             )}
           </Box>
 
-          <Box sx={{ flexBasis: '20%', textAlign: 'center' }}>
+          <Box sx={{ flexBasis: '10%', textAlign: 'center' }}>
             <Tooltip
               title={
                 <React.Fragment>
@@ -317,7 +318,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
               }}
             >
               <InfoOutlinedIcon sx={{
-                fontSize: '1rem',
+                fontSize: '1.2rem',
                 cursor: 'pointer',
                 color: isTaskClosed ? 'text.disabled' : 'action.active',
                 '&:hover': { color: 'primary.main' }
@@ -327,7 +328,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
 
           <Box
             sx={{
-              flexBasis: '40%',
+              flexBasis: '45%',
               textAlign: 'right',
               overflow: 'hidden',
               whiteSpace: 'nowrap',
@@ -351,13 +352,42 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
                 {isCompleting ? <CircularProgress size={12} sx={{ color: 'success.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Завершить'}
               </Button>
             ) : (
-              <Tooltip title={`Срок до: ${formatDateTime(task.deadline)}`} placement="bottom-end">
-                <Typography variant="caption" sx={{ fontSize: 'inherit' }}>
+              <Tooltip title={`Дедлайн: ${formatDateTime(task.deadline)}`} placement="bottom-end">
+                <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
                   {formatDateTime(task.deadline)}
                 </Typography>
               </Tooltip>
             )}
           </Box>
+        </Box>
+
+        <Box sx={{ mt: 0.5, pt: 0.5, borderTop: '1px solid rgba(0,0,0,0.08)', fontSize: '0.7rem', textAlign: 'left', px: 0.5, minHeight: '20px' /* Чтобы блок не исчезал, если сделки нет, но занимал место */ }}>
+          {task.deal && task.deal_details?.name ? (
+            <Typography variant="caption" component="div" sx={{ fontSize: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+             
+              <MuiLink 
+                component={RouterLink} 
+                to={`/deals/${task.deal}`} 
+                variant="caption"
+                sx={{ 
+                  fontSize: 'inherit', 
+                  fontWeight: 'normal',
+                  textDecoration: 'none',
+                  color: 'text.primary',
+                  '&:hover': { 
+                    textDecoration: 'underline',
+                    color: 'text.primary',
+                  } 
+                }}
+              >
+                {task.deal_details.name}
+              </MuiLink>
+            </Typography>
+          ) : (
+            <Typography variant="caption" component="div" sx={{ fontSize: 'inherit', color: 'text.disabled' }}>
+              Сделка: -
+            </Typography>
+          ) }
         </Box>
 
       </CardContent>

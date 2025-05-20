@@ -116,7 +116,16 @@ const DealListPage = () => {
                 <td className="py-1 px-2 text-center">{idx + 1}</td>
                 <td className="py-1 px-3 text-left">
                   <Link to={`/deals/${deal.id}`} className="text-blue-500 hover:underline">
-                    {deal.name || 'Без названия'}
+                    <span style={{
+                      display: 'inline-block',
+                      maxWidth: '250px', // Ограничиваем максимальную ширину
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      verticalAlign: 'bottom' // Для лучшего выравнивания с иконками/другим текстом в строке, если есть
+                    }}>
+                      {deal.name || 'Без названия'}
+                    </span>
                   </Link>
                 </td>
                 <td className="py-1 px-3 text-left">{`${new Date(deal.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${new Date(deal.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</td>
