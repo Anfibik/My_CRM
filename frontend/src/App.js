@@ -123,7 +123,7 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
-      <nav className="h-[40px] bg-gray-800 p-1 flex justify-between items-center">
+      <nav className="h-[40px] bg-gray-800 p-2 flex justify-between items-center">
         <ul className="flex space-x-4">
           <li>
             <Link to="/inquiries" className="text-white hover:text-gray-300">
@@ -152,7 +152,7 @@ const AppContent = () => {
           </li>
           <li>
             <Link to="/my-tasks-kanban" className="text-white hover:text-gray-300">
-              Мои задачи (Канбан)
+              Задачи
             </Link>
           </li>
         </ul>

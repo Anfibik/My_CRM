@@ -50,14 +50,6 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
   } : {};
 
   // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
-  // Обработчик клика по типу задачи (переход на страницу деталей задачи)
-  const handleTaskTypeClick = (e) => {
-    if (isDraggable) { // Если карточка перетаскиваемая, предотвращаем всплытие, чтобы не мешать DND
-      e.stopPropagation();
-    }
-    navigate(`/tasks/${task.id}`); // Переход на страницу задачи
-  };
-
   // Флаг, указывающий, закрыта ли задача
   const isTaskClosed = task.status === 'closed';
 
@@ -138,8 +130,12 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
           backgroundColor: 'rgba(162, 162, 162, 0.83)',
         }),
       }}
-      // Клик по карточке (если не перетаскиваемая) ведет на страницу задачи
-      onClick={!isDraggable ? () => navigate(`/tasks/${task.id}`) : undefined}
+      // Клик по карточке ведет на страницу задачи
+      onClick={() => {
+        // Опционально: можно добавить условие, если закрытые задачи не должны быть кликабельны
+        // if (task.status === 'closed') return; 
+        navigate(`/tasks/${task.id}`);
+      }}
     >
       <CardContent sx={{ padding: 0.5, '&:last-child': { pb: 0 } /* Убираем лишний padding снизу */ }}>
         {/* --- ВЕРХНИЙ РЯД: СТАТУС, ТИП ЗАДАЧИ, ИНФО О ДЕДЛАЙНЕ --- */}
@@ -154,10 +150,9 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
             }) : null}
           </Tooltip>
 
-          {/* Тип задачи (кликабельный) */}
+          {/* Тип задачи (некликабельный) */}
           <Typography
             variant="caption"
-            onClick={handleTaskTypeClick} // Обработчик клика для перехода
             sx={{
               flexGrow: 1, // Занимает доступное пространство
               textAlign: 'center',
@@ -167,10 +162,6 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
               whiteSpace: 'nowrap', // Запрет переноса строки
               fontSize: '0.75rem',
               lineHeight: '1.2',
-              cursor: 'pointer',
-              '&:hover': {
-                textDecoration: 'underline', // Подчеркивание при наведении
-              }
             }}
           >
             {getTaskTypeLabel(task.task_type)} {/* Отображение метки типа задачи */}
@@ -415,6 +406,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
                     color: 'text.primary',
                   } 
                 }}
+                onClick={(e) => e.stopPropagation()} // Предотвращаем всплытие события
               >
                 {task.deal_details.name} {/* Название сделки */}
               </MuiLink>
