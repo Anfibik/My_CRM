@@ -305,6 +305,7 @@ const MyTasksKanbanPage = () => {
                               task={task}
                               provided={providedDraggable}
                               isDragging={snapshotDraggable.isDragging}
+                              showInteractionButtons={false} // <--- Вот это изменение
                             />
                           )}
                         </Draggable>

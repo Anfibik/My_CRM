@@ -69,6 +69,15 @@ const TasksArea = ({ deal }) => {
     }
   }, [deal?.id]);
 
+  // Функция для обновления статуса задачи в UI
+  const handleTaskStatusUpdate = (taskId, updatedTask) => {
+    setTasks(prevTasks => 
+      prevTasks.map(t => 
+        t.id === taskId ? updatedTask : t
+      )
+    );
+  };
+
   // Загрузка текущего пользователя
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -204,7 +213,7 @@ const TasksArea = ({ deal }) => {
         <Grid container spacing={1}>
           {tasks.map(task => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={task.id}>
-              <TaskCard task={task} />
+              <TaskCard task={task} onTaskUpdate={handleTaskStatusUpdate} />
             </Grid>
           ))}
         </Grid>
