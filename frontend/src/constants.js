@@ -73,6 +73,12 @@ export const STATUS_LABELS = { // For tasks
   closed: "Закрыта",
 };
 
+// Создаем новый объект для ВЫБИРАЕМЫХ статусов, исключая 'not_accepted'
+const selectableLabels = { ...STATUS_LABELS };
+delete selectableLabels.not_accepted;
+
+export const SELECTABLE_STATUS_LABELS = selectableLabels;
+
 // Arrays of objects for populating select/dropdown options
 const createOptionsArray = (labelsObject) => 
   Object.entries(labelsObject).map(([value, label]) => ({ value, label }));
@@ -83,4 +89,9 @@ export const DEPARTMENT_OPTIONS = createOptionsArray(DEPARTMENT_LABELS);
 export const DEAL_STATUS_OPTIONS = createOptionsArray(DEAL_STATUS_LABELS);
 export const TASK_TYPE_OPTIONS = createOptionsArray(TASK_TYPE_LABELS);
 export const PRIORITY_OPTIONS = createOptionsArray(PRIORITY_LABELS);
-export const STATUS_OPTIONS = createOptionsArray(STATUS_LABELS);
+
+// Используется для отображения ВСЕХ статусов, включая "Не принята" (если где-то нужно, например, для отображения лейбла)
+export const ALL_STATUS_OPTIONS = createOptionsArray(STATUS_LABELS); 
+
+// Используется для выпадающих списков ВЫБОРА статуса (без "Не принята")
+export const SELECTABLE_STATUS_OPTIONS = createOptionsArray(SELECTABLE_STATUS_LABELS);

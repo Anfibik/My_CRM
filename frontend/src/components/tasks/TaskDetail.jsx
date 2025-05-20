@@ -52,7 +52,23 @@ const TaskDetail = () => {
       try {
         setLoading(true);
         const response = await api.get(`/api/tasks/${id}/`);
-        setTask(response.data);
+        let taskData = response.data;
+
+        // Автоматическое обновление статуса с 'not_accepted' на 'pending'
+        if (taskData.status === 'not_accepted') {
+          try {
+            console.log(`Task ${id} has status 'not_accepted', attempting to update to 'pending'.`);
+            const statusUpdateResponse = await api.patch(`/api/tasks/${id}/`, { status: 'pending' });
+            taskData = statusUpdateResponse.data; // Используем обновленные данные с сервера
+            console.log(`Task ${id} status automatically updated to 'pending'.`, taskData);
+          } catch (statusUpdateError) {
+            console.error(`Error automatically updating status for task ${id} from 'not_accepted' to 'pending':`, statusUpdateError.response?.data || statusUpdateError.message);
+            // Если не удалось обновить статус, задача останется 'not_accepted' до следующей попытки или ручного вмешательства (если оно возможно)
+            // Можно добавить уведомление для пользователя здесь, если это критично.
+          }
+        }
+
+        setTask(taskData);
         setError(null);
       } catch (err) {
         console.error('Ошибка при загрузке задачи:', err);

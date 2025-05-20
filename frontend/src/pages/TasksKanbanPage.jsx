@@ -18,6 +18,12 @@ const COLUMN_ORDER = [
 const getColumnHeaderStyling = (statusKey) => {
   const colorInfo = getStatusColor(statusKey); // Вызываем один раз
 
+  // Специальный стиль для столбца 'not_accepted'
+  if (statusKey === 'not_accepted') {
+    // Возвращаем красный фон и белый текст, как было запрошено (стиль похожий на первоначальный для ошибок)
+    return { backgroundColor: 'error.main', color: 'common.white', borderBottom: '3px solid #b2102f' }; 
+  }
+
   let backgroundColor = 'grey.200'; // Дефолтный фон
   let textColor = 'common.black';   // Дефолтный цвет текста (изменил на черный для лучшей читаемости на grey.200)
 
@@ -143,6 +149,15 @@ const MyTasksKanbanPage = () => {
       return;
     }
 
+    // 2. Запрет перетаскивания В столбец 'not_accepted' из любого другого столбца
+    if (destination.droppableId === 'not_accepted' && source.droppableId !== 'not_accepted') {
+      console.warn("Attempted to drag task into 'not_accepted' column. Operation denied.");
+      // Можно временно показать сообщение об ошибке, если есть механизм setError для этого
+      // setError("Перемещение задач в столбец 'Не принята' запрещено.");
+      // setTimeout(() => setError(null), 3000); // Убрать сообщение через 3 секунды
+      return; // Прерываем обработку
+    }
+
     const startColumnKey = source.droppableId;
     const finishColumnKey = destination.droppableId;
     const startColumnTasks = Array.from(tasksByStatus[startColumnKey] || []);
@@ -258,15 +273,19 @@ const MyTasksKanbanPage = () => {
                   ref={provided.innerRef} // Привязываем ref от Droppable к Paper
                   {...provided.droppableProps} // Применяем props от Droppable к Paper
                   elevation={3} 
-                  sx={{ 
+                  sx={{
                     width: '200px', // Чуть шире, чтобы убрать возможный гор. скролл
                     flexShrink: 0,
                     height: '100%',      // Явно занять всю высоту родителя
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',  // Paper сама не скроллится
-                    backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'background.paper', // Подсветка при перетаскивании НАД колонкой
+                    // Условный фон для всего столбца 'not_accepted'
+                    backgroundColor: statusKey === 'not_accepted' 
+                                      ? ' rgba(150, 1, 1, 0.09)' // Фон всего столбца "Не принята" сделан темнее (grey.200)
+                                      : (snapshot.isDraggingOver ? 'action.hover' : 'background.paper'), // Подсветка при перетаскивании НАД колонкой
                     transition: 'background-color 0.2s ease',
+                    // При желании можно добавить и другие стили для not_accepted, например:
                   }}
                 >
                   {/* Column Header - Direct child of Paper */}

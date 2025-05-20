@@ -244,7 +244,7 @@ class Deal(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        self.name = f"{self.lead.name} ({self.department})"
+        self.name = f"{self.lead.contact.company.name} ({self.department})"
         super().save(*args, **kwargs)
 
     def __str__(self):

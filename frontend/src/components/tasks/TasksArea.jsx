@@ -22,6 +22,7 @@ import TaskCard from './TaskCard.jsx';
 import { STATUS_LABELS, TASK_TYPE_LABELS } from '../../constants'; // Import constants
 import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Новый импорт
 import { addParticipantToDealIfNeeded } from '../../api/deals'; // <-- Добавлен импорт
+import eventBus from '../../utils/eventBus'; // <-- Добавлен импорт eventBus
 
 // Ленивая загрузка модального окна, чтобы избежать циклических зависимостей
 // const TaskModal = lazy(() => import('./TaskModal'));
@@ -125,7 +126,12 @@ const TasksArea = ({ deal }) => {
         // Функция addParticipantToDealIfNeeded должна корректно это обработать.
         try {
           // console.log(`TasksArea: Attempting to add executor ${newTask.executor} (type: ${typeof newTask.executor}) to deal ${newTask.deal}. Current deal participants:`, deal.participants);
-          await addParticipantToDealIfNeeded(newTask.deal, newTask.executor, deal.participants);
+          const updatedDealFromServer = await addParticipantToDealIfNeeded(newTask.deal, newTask.executor, deal.participants);
+          
+          if (updatedDealFromServer) {
+            // console.log('TasksArea: Deal participants updated, dispatching event.', updatedDealFromServer);
+            eventBus.dispatch('dealUpdated', updatedDealFromServer);
+          }
           // Если нужно обновить состояние 'deal' в TasksArea (например, если оно отображает участников), 
           // то addParticipantToDealIfNeeded должна возвращать обновленную сделку, и здесь нужно будет ее установить.
           // В данном сценарии, основное обновление участников будет видно в DealDetailPage.

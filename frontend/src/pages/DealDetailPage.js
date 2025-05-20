@@ -15,6 +15,7 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/
 import DealHistory from '../components/deals/DealHistory';
 import MyEvents from '../components/common/MyEvents.jsx';
 import GeneralFeed from '../components/common/GeneralFeed';
+import eventBus from '../utils/eventBus';
 
 const DealDetailPage = () => {
   const { id } = useParams();         // Считываем ID сделки из URL
@@ -51,8 +52,32 @@ const DealDetailPage = () => {
     fetchDeal();
     fetchUsers();
     fetchDealEvents();
+
+    const handleDealUpdateEvent = (updatedDeal) => {
+      // Проверяем, что событие относится к текущей сделке
+      // id из useParams - строка, updatedDeal.id может быть числом
+      if (updatedDeal && updatedDeal.id === parseInt(id, 10)) {
+        // console.log('DealDetailPage: Received dealUpdated event, updating state.', updatedDeal);
+        setDeal(updatedDeal);
+        // Обновляем также selectedParticipants, если это необходимо для консистентности
+        // (хотя setDeal(updatedDeal) должно перерендерить DealSidebar, который использует deal.participants_details)
+        if (updatedDeal.participants_details) {
+          setSelectedParticipants(updatedDeal.participants_details.map(u => u.id));
+        }
+        if (updatedDeal.account_details || updatedDeal.account) {
+            setSelectedAccount(updatedDeal.account_details?.id || updatedDeal.account || null);
+        }
+      }
+    };
+
+    eventBus.on('dealUpdated', handleDealUpdateEvent);
+
+    // Очистка подписки при размонтировании компонента
+    return () => {
+      eventBus.remove('dealUpdated', handleDealUpdateEvent);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [id]); // Добавляем id как зависимость, чтобы переподписываться при изменении id (хотя для детальной страницы это редкость)
 
   useEffect(() => {
     if (deal) {

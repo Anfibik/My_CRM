@@ -94,12 +94,12 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
 
         {/* Создаем общий стиль для меток с фиксированной шириной */}
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Продукт...... :</Box>
+          <Box component="span" sx={labelStyle}>Продукт . . . </Box>
           <Box component="span" sx={valueStyle}>{deal.department || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Стоимость. :</Box>
+          <Box component="span" sx={labelStyle}>Стоимость .</Box>
           <Box component="span" sx={valueStyle}>
             {formatAmount(deal.contract_amount)}
           </Box>
@@ -108,17 +108,17 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Компания.. :</Box>
+          <Box component="span" sx={labelStyle}>Компания . .</Box>
           <Box component="span" sx={valueStyle}>{company.name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Контакт....... :</Box>
+          <Box component="span" sx={labelStyle}>Контакт . . . .</Box>
           <Box component="span" sx={valueStyle}>{contact.name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Телефон...... :</Box>
+          <Box component="span" sx={labelStyle}>Телефон . . . </Box>
           <Box component="span" sx={valueStyle}>
             <span>{contact.phone || '—'}</span>
             {contact.messenger && <span style={{ marginLeft: '4px' }}>({contact.messenger})</span>}
@@ -126,7 +126,7 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Email............. :</Box>
+          <Box component="span" sx={labelStyle}>Email . . . . . . </Box>
           <Box component="span" sx={valueStyle}>{contact.email || '—'}</Box>
         </Box>
 
@@ -163,12 +163,12 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Менеджер. :</Box>
+          <Box component="span" sx={labelStyle}>Менеджер . </Box>
           <Box component="span" sx={valueStyle}>{deal.responsible?.full_name || '—'}</Box>
         </Box>
 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <Box component="span" sx={labelStyle}>Оператор... :</Box>
+          <Box component="span" sx={labelStyle}>Оператор . .</Box>
           <Box component="span" sx={valueStyle}>{deal.lead.converted_by?.full_name || '—'}</Box>
         </Box>
 
@@ -184,7 +184,7 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
                   cursor: 'pointer'
                 }}
               >
-                Аккаунт....... :
+                Аккаунт . . . .
               </Box>
               <Box component="span" sx={valueStyle}>{deal.account_details?.full_name}</Box>
             </>
