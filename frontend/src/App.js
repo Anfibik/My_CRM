@@ -8,13 +8,15 @@ import ErrorDisplay from './components/common/ErrorDisplay';
 import CompanyListPage from './pages/CompanyListPage';
 import ContactListPage from './pages/ContactListPage';
 import LeadListPage from './pages/LeadListPage';
+import LeadDetailPage from './pages/LeadDetailPage';
 import DealListPage from './pages/DealListPage';
+import DealDetailPage from './pages/DealDetailPage';
 import InquiryListPage from './pages/InquiryListPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 import UserAuthModal from './components/auth/UserAuthModal';
 import { Box } from '@mui/material';
+import NavigationBar from './components/layout/NavigationBar';
 
-const DealDetailPage = lazy(() => import('./pages/DealDetailPage'));
 const TasksKanbanPage = lazy(() => import('./pages/TasksKanbanPage'));
 
 const AppContent = () => {
@@ -123,62 +125,22 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
-      <nav className="h-[40px] bg-gray-800 p-2 flex justify-between items-center">
-        <ul className="flex space-x-4">
-          <li>
-            <Link to="/inquiries" className="text-white hover:text-gray-300">
-              Обращения
-            </Link>
-          </li>
-          <li>
-            <Link to="/contacts" className="text-white hover:text-gray-300">
-              Контакты
-            </Link>
-          </li>
-          <li>
-            <Link to="/companies" className="text-white hover:text-gray-300">
-              Компании
-            </Link>
-          </li>
-          <li>
-            <Link to="/leads" className="text-white hover:text-gray-300">
-              Лиды
-            </Link>
-          </li>
-          <li>
-            <Link to="/deals" className="text-white hover:text-gray-300">
-              Сделки
-            </Link>
-          </li>
-          <li>
-            <Link to="/my-tasks-kanban" className="text-white hover:text-gray-300">
-              Задачи
-            </Link>
-          </li>
-        </ul>
-        <div className="flex items-center">
-          <span className="text-white mr-3">{user.full_name}</span>
-          <button
-            onClick={logout}
-            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-          >
-            Выйти
-          </button>
-        </div>
-      </nav>
+      <NavigationBar user={user} logout={logout} />
 
       <Box sx={{ 
         height: 'calc(100vh - 40px)', // Высота за вычетом нав. панели
         display: 'flex',
         flexDirection: 'column',
-        overflowY: 'auto' // Позволить скролл на уровне всего контента страницы, если он превышает доступную высоту
+        overflowY: 'auto', // Позволить скролл на уровне всего контента страницы, если он превышает доступную высоту
+        boxSizing: 'border-box'
       }}>
         <Box sx={{ 
           p: 2, // Сохраняем отступы, которые были у div className="p-2"
           flexGrow: 1, 
-          overflowY: 'auto',   // Позволяем вертикальный скролл, если контент не помещается
           display: 'flex',      // Чтобы TasksKanbanPage (если это flex) мог растянуться
-          flexDirection: 'column' // Чтобы TasksKanbanPage (если это flex) мог растянуться
+          flexDirection: 'column', // Чтобы TasksKanbanPage (если это flex) мог растянуться
+          boxSizing: 'border-box',
+          minHeight: 0 // Для корректной работы вложенных flex-контейнеров
         }}>
           <Suspense fallback={<div>Загрузка страницы...</div>}>
             <Routes>
@@ -208,6 +170,14 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute>
                     <LeadListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leads/:leadId"
+                element={
+                  <ProtectedRoute>
+                    <LeadDetailPage />
                   </ProtectedRoute>
                 }
               />

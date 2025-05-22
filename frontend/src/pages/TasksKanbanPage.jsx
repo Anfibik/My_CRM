@@ -223,7 +223,16 @@ const MyTasksKanbanPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ pt: 2, height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
+    <Container 
+      maxWidth="xl" 
+      sx={{ 
+        pt: 2, 
+        display: 'flex', 
+        flexDirection: 'column',
+        flexGrow: 1, 
+        minHeight: 0 
+      }}
+    >
       
       <TaskFiltersComponent /> 
 
