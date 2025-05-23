@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useCompany } from '../context/CompanyContext';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 
@@ -126,8 +127,18 @@ const CompanyListPage = () => {
                     </button>
                   </div>
                 </td>
-                <td className="py-1 px-3 text-left">{company.name}</td>
-                <td className="py-1 px-3 text-left">{company.main_contact ? company.main_contact.name : <span className="text-gray-400">—</span>}</td>
+                <td className="py-1 px-3 text-left font-semibold">
+                  <Link to={`/companies/${company.id}`} className="text-blue-600 hover:underline">
+                    {company.name}
+                  </Link>
+                </td>
+
+                <td className="py-1 px-3 text-left">
+                  <Link to={`/contacts/${company.main_contact.id}`} className="text-gray hover:underline">
+                    {company.main_contact.name}
+                  </Link>                 
+                  </td>
+
                 <td className="py-1 px-3 text-left">
                   {company.site ? (
                     <a href={company.site.startsWith('http') ? company.site : `https://${company.site}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">

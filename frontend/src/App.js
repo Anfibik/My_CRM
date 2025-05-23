@@ -8,6 +8,8 @@ import ErrorDisplay from './components/common/ErrorDisplay';
 import CompanyListPage from './pages/CompanyListPage';
 import ContactListPage from './pages/ContactListPage';
 import LeadListPage from './pages/LeadListPage';
+import CompanyDetailPage from './pages/CompanyDetailPage';
+import ContactDetailPage from './pages/ContactDetailPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import DealListPage from './pages/DealListPage';
 import DealDetailPage from './pages/DealDetailPage';
@@ -156,12 +158,28 @@ const AppContent = () => {
                 }
               />
               <Route
+                path="/companies/:companyId"
+                element={
+                  <ProtectedRoute>
+                    <CompanyDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/contacts"
                 element={
                   <ProtectedRoute>
                     <ContactProvider>
                       <ContactListPage />
                     </ContactProvider>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/contacts/:contactId"
+                element={
+                  <ProtectedRoute>
+                    <ContactDetailPage />
                   </ProtectedRoute>
                 }
               />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useContacts } from '../context/ContactContext';
 
 const ContactListPage = () => {
@@ -94,7 +95,7 @@ const ContactListPage = () => {
           <thead>
             <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
               <th className="py-3 px-2 text-center w-12">№</th>
-              <th className="py-3 px-0 text-center" style={{width: '40px', minWidth: '40px', maxWidth: '40px'}}></th>
+              <th className="py-3 px-0 text-center" style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }}></th>
               <th className="py-3 px-6 text-left">Имя</th>
               <th className="py-3 px-6 text-left">Телефон</th>
               <th className="py-3 px-6 text-left">Email</th>
@@ -106,7 +107,7 @@ const ContactListPage = () => {
             {(contacts || []).map((contact, idx) => (
               <tr key={contact.id} className="border-b border-gray-200 hover:bg-gray-100 text-sm leading-tight h-8">
                 <td className="py-1 px-2 text-center align-middle font-semibold">{idx + 1}</td>
-                <td className="py-1 px-0 text-center align-middle" style={{width: '40px', minWidth: '40px', maxWidth: '40px', whiteSpace: 'nowrap'}}>
+                <td className="py-1 px-0 text-center align-middle" style={{ width: '40px', minWidth: '40px', maxWidth: '40px', whiteSpace: 'nowrap' }}>
                   <div className="flex flex-row items-center justify-center gap-1 whitespace-nowrap">
                     <button
                       onClick={() => handleEdit(contact)}
@@ -127,18 +128,34 @@ const ContactListPage = () => {
                     </button>
                   </div>
                 </td>
-                <td className="py-1 px-3 text-left">{contact.name}</td>
+
+                <td className="py-1 px-3 text-left font-semibold">
+                  <Link to={`/contacts/${contact.id}`} className="text-blue-600 hover:underline">
+                    {contact.name}
+                  </Link>
+                </td>
+
                 <td className="py-1 px-3 text-left">{contact.phone}</td>
                 <td className="py-1 px-3 text-left">{contact.email}</td>
-                <td className="py-1 px-3 text-left">{contact.company ? contact.company.name : <span className="text-gray-400">—</span>}</td>
+
+                <td className="py-1 px-3 text-left">
+                  {contact.company ? (
+                    <Link to={`/companies/${contact.company.id}`} className="hover:underline">
+                      {contact.company.name}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+
                 <td className="py-1 px-3 text-left">
                   {contact.messenger
                     ? ({
-                        telegram: 'Телеграмм',
-                        viber: 'Вайбер',
-                        whatsapp: 'WhatsApp',
-                        signal: 'Сигнал'
-                      }[contact.messenger] || contact.messenger)
+                      telegram: 'Телеграмм',
+                      viber: 'Вайбер',
+                      whatsapp: 'WhatsApp',
+                      signal: 'Сигнал'
+                    }[contact.messenger] || contact.messenger)
                     : <span className="text-gray-400">—</span>}
                 </td>
               </tr>

@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
-from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
-from .models import ROLE_CHOICES, DEPARTMENT_CHOICES
+from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment
+from .models import ROLE_CHOICES
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -40,6 +39,7 @@ class ContactSerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     contact = ContactSerializer(read_only=True)
     converted_by = CustomUserSerializer(source='inquiry.responsible', read_only=True)
+    department_names = serializers.SerializerMethodField()
     participants = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=CustomUser.objects.all(),
@@ -54,6 +54,11 @@ class LeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = '__all__'
+
+    def get_department_names(self, obj):
+        if obj.department_assignments:
+            return list(obj.department_assignments.keys())
+        return []
 
 
 class InquirySerializer(serializers.ModelSerializer):
@@ -148,7 +153,6 @@ class DealSerializer(serializers.ModelSerializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True, label='Подтверждение пароля')
     role = serializers.ChoiceField(choices=ROLE_CHOICES, label='Роль')
-    department = serializers.ChoiceField(choices=DEPARTMENT_CHOICES, label='Департамент')
 
     class Meta:
         model = CustomUser
@@ -157,7 +161,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'work_phone',
             'work_email',
             'role',
-            'department',
             'password',
             'password2',
         ]

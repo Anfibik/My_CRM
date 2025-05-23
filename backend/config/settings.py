@@ -172,13 +172,6 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# Настройки для работы с токенами
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-    ],
-}
-
 AUTH_USER_MODEL = 'crm.CustomUser'
 ASGI_APPLICATION = 'config.asgi.application'
 

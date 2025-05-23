@@ -384,6 +384,7 @@ class Task(models.Model):
         ("payment", "Оплата"),
         ("delivery", "Доставка"),
         ("universal", "Универсальная"),
+        ("step", "Шаг")
     ]
     
     PRIORITY_CHOICES = [

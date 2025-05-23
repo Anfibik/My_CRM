@@ -114,7 +114,7 @@ const DealListPage = () => {
             {deals.map((deal, idx) => (
               <tr key={deal.id} className="border-b border-gray-200 hover:bg-gray-100 text-sm leading-tight h-8">
                 <td className="py-1 px-2 text-center">{idx + 1}</td>
-                <td className="py-1 px-3 text-left">
+                <td className="py-1 px-3 text-left font-semibold">
                   <Link to={`/deals/${deal.id}`} className="text-blue-500 hover:underline">
                     <span style={{
                       display: 'inline-block',

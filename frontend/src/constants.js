@@ -57,6 +57,7 @@ export const TASK_TYPE_LABELS = {
   payment: "Оплата",
   delivery: "Доставка",
   universal: "Общая",
+  step: "Шаг",
 };
 
 export const PRIORITY_LABELS = {

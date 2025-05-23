@@ -74,8 +74,8 @@ const LeadListPage = () => {
               {leads.map((lead, idx) => (
                 <tr key={lead.id} className="border-b border-gray-200 hover:bg-gray-100 text-sm leading-tight h-10">
                   <td className="py-1 px-2 text-center">{idx + 1}</td>
-                  <td className="py-1 px-3 text-left">
-                    <Link to={`/leads/${lead.id}`} className="text-blue-500 hover:underline">
+                  <td className="py-1 px-3 text-left font-semibold">
+                    <Link to={`/leads/${lead.id}`} className="text-blue-500">
                       <span style={{
                         display: 'inline-block',
                         maxWidth: '250px',
@@ -90,14 +90,14 @@ const LeadListPage = () => {
                   </td>
                   <td className="py-1 px-3 text-left">
                     {lead.contact ? (
-                      <Link to={`/contacts/${lead.contact.id}`} className="text-blue-500 hover:underline">
+                      <Link to={`/contacts/${lead.contact.id}`} className="hover:underline">
                         {lead.contact.name}
                       </Link>
                     ) : '—'}
                   </td>
                   <td className="py-1 px-3 text-left">
                     {lead.contact && lead.contact.company ? (
-                      <Link to={`/companies/${lead.contact.company.id}`} className="text-blue-500 hover:underline">
+                      <Link to={`/companies/${lead.contact.company.id}`} className="hover:underline">
                         {lead.contact.company.name}
                       </Link>
                     ) : '—'}
