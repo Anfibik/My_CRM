@@ -419,7 +419,7 @@ class Task(models.Model):
     priority = models.CharField(
         max_length=20,
         choices=PRIORITY_CHOICES,
-        default="medium",
+        default="low",
         verbose_name="Приоритет"
     )
     status = models.CharField(

@@ -104,57 +104,16 @@ const TasksArea = ({ deal }) => {
     setIsModalOpen(false);
   };
 
-  // Обработчик для создания новой задачи
-  const handleCreateTask = async (taskDataWithDescription) => {
-    setIsLoading(true);
-    try {
-      const dataToSend = {
-        ...taskDataWithDescription, // Включает title, task_type, priority, deadline, executor, participants (задачи), observers, description
-        deal: deal?.id, 
-      };
-
-      const taskResponse = await api.post('/api/tasks/', dataToSend);
-      const newTask = taskResponse.data;
-      setTasks(prevTasks => [...prevTasks, newTask]);
+  // Обработчик для onSubmit из TaskModal
+  // Теперь он принимает уже созданную задачу
+  const handleTaskCreated = (createdTask) => {
+    if (createdTask) {
+      setTasks(prevTasks => [createdTask, ...prevTasks]); // Добавляем новую задачу в начало списка
+      // eventBus.emit('showAlert', { message: 'Задача успешно создана!', type: 'success' }); // Пример уведомления
       setError(null); // Сбрасываем предыдущие ошибки, если были
-      handleCloseModal(); // Закрываем модальное окно
-
-      // Новая логика: Добавление исполнителя задачи в участники сделки
-      if (newTask.executor && newTask.deal && deal && Array.isArray(deal.participants)) {
-        // Убедимся, что deal.participants существует и является массивом
-        // newTask.executor может быть числом, а ID в deal.participants могут быть строками или числами.
-        // Функция addParticipantToDealIfNeeded должна корректно это обработать.
-        try {
-          // console.log(`TasksArea: Attempting to add executor ${newTask.executor} (type: ${typeof newTask.executor}) to deal ${newTask.deal}. Current deal participants:`, deal.participants);
-          const updatedDealFromServer = await addParticipantToDealIfNeeded(newTask.deal, newTask.executor, deal.participants);
-          
-          if (updatedDealFromServer) {
-            // console.log('TasksArea: Deal participants updated, dispatching event.', updatedDealFromServer);
-            eventBus.dispatch('dealUpdated', updatedDealFromServer);
-          }
-          // Если нужно обновить состояние 'deal' в TasksArea (например, если оно отображает участников), 
-          // то addParticipantToDealIfNeeded должна возвращать обновленную сделку, и здесь нужно будет ее установить.
-          // В данном сценарии, основное обновление участников будет видно в DealDetailPage.
-        } catch (participantError) {
-          console.error('TasksArea: Failed to add task executor to deal participants:', participantError);
-          // Можно отобразить пользователю некритическую ошибку, т.к. задача уже создана.
-          // Например, setError('Задача создана, но не удалось добавить исполнителя в участники сделки.'); 
-          // Но это может перекрыть сообщение об успешном создании задачи, так что осторожно.
-        }
-      } else {
-        if (!newTask.executor) console.warn('TasksArea: New task has no executor.');
-        if (!newTask.deal) console.warn('TasksArea: New task is not associated with a deal.');
-        if (!deal) console.warn('TasksArea: Deal data is not available in TasksArea.');
-        if (deal && !Array.isArray(deal.participants)) console.warn('TasksArea: deal.participants is not an array or is missing:', deal.participants);
-      }
-      // Конец новой логики
-
-    } catch (error) {
-      console.error("Ошибка при создании задачи:", error.response?.data || error.message);
-      setError(error.response?.data?.detail || 'Не удалось создать задачу. Проверьте введенные данные.');
-    } finally {
-      setIsLoading(false);
     }
+    // Модальное окно закрывается в самом TaskModal через closeAll(), который вызывает onClose, 
+    // так что здесь дополнительно закрывать его не нужно.
   };
 
   // Хелперы для отображения статуса и приоритета
@@ -263,7 +222,7 @@ const TasksArea = ({ deal }) => {
           <TaskModal
             open={isModalOpen}
             onClose={handleCloseModal}
-            onSubmit={handleCreateTask}
+            onSubmit={handleTaskCreated} // <--- Используем новую функцию
             users={users}
             dealId={deal?.id}
           />

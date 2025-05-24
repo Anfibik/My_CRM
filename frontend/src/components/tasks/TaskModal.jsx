@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, 
          Select, MenuItem, FormControl, InputLabel, Box, Checkbox, FormControlLabel } from '@mui/material';
 import { TASK_TYPE_LABELS, PRIORITY_LABELS, TASK_TYPE_OPTIONS } from '../../constants';
+import { createTask } from './TaskCreator'; 
 
 // Helper functions
 const formatDateTimeLocal = (date) => {
@@ -46,15 +47,15 @@ const calculateDeadlineByAddingWorkHours = (hoursToAdd) => {
   return deadlineDate;
 };
 
-const TaskModal = ({ open, onClose, onSubmit, users }) => {
+const TaskModal = ({ open, onClose, onSubmit, users, dealId }) => {
   const initialTaskState = {
     title: '',
-    task_type: 'universal',
+    taskType: 'universal', 
     priority: 'low',
     deadline: calculateTomorrow1730(), 
-    executor: '',
-    participants: [],
-    observers: []
+    executorId: '',     
+    participantIds: [],  
+    observerIds: []     
   };
   const [taskData, setTaskData] = useState(initialTaskState);
   const [isCritical, setIsCritical] = useState(false);
@@ -152,32 +153,51 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
     setDescriptionOpen(true);
   };
 
-  const handleSubmit = () => {
-    // Convert deadline to UTC ISO string before submitting
-    const deadlineDate = new Date(taskData.deadline); // taskData.deadline is local "YYYY-MM-DDTHH:mm"
-    const submissionData = {
-      ...taskData,
-      deadline: deadlineDate.toISOString(), // Converts to UTC string "YYYY-MM-DDTHH:mm:ss.sssZ"
-      description,
+  const handleSubmit = async () => {
+    if (!description) {
+      alert('Описание задачи не может быть пустым.'); 
+      return;
+    }
+
+    if (!dealId) {
+        alert('ID сделки (dealId) не предоставлен. Невозможно создать задачу.');
+        console.error('TaskModal: dealId is missing in handleSubmit');
+        return;
+    }
+
+    const taskDetailsForApi = {
+      title: taskData.title,
+      description: description,
+      dealId: dealId, 
+      priority: taskData.priority,
+      taskType: taskData.taskType, 
+      // deadline: taskData.deadline,
+      // Преобразуем локальную строку времени в ISO UTC строку
+      deadline: taskData.deadline ? new Date(taskData.deadline).toISOString() : null, 
+      executorId: taskData.executorId || null, // Передаем null, если не выбрано
+      participantIds: taskData.participantIds,
+      observerIds: taskData.observerIds,
     };
-    onSubmit(submissionData);
-    resetForm();
-    onClose();
+
+    try {
+      console.log("TaskModal handleSubmit, taskDetailsForApi:", taskDetailsForApi); 
+      const createdTask = await createTask(taskDetailsForApi);
+      if (onSubmit) {
+        onSubmit(createdTask); 
+      }
+      closeAll(); 
+    } catch (error) {
+      console.error('Ошибка при создании задачи из TaskModal:', error);
+      alert(`Ошибка при создании задачи: ${error.message}`); 
+    }
   };
 
   const resetForm = () => {
-    // Создаем дату на завтра в 17:30
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(17, 30, 0, 0);
     
-    // Форматируем дату для input datetime-local
-    const year = tomorrow.getFullYear();
-    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const day = String(tomorrow.getDate()).padStart(2, '0');
-    const hours = String(tomorrow.getHours()).padStart(2, '0');
-    const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
-    const formattedDeadline = `${year}-${month}-${day}T${hours}:${minutes}`;
+    const formattedDeadline = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}T${String(tomorrow.getHours()).padStart(2, '0')}:${String(tomorrow.getMinutes()).padStart(2, '0')}`;
 
     setTaskData({
       ...initialTaskState,
@@ -213,8 +233,8 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             <FormControl fullWidth>
               <InputLabel>Тип задачи</InputLabel>
               <Select
-                name="task_type"
-                value={taskData.task_type}
+                name="taskType"
+                value={taskData.taskType}
                 onChange={handleChange}
                 label="Тип задачи"
               >
@@ -248,7 +268,7 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
                 value={deadlineOption}
                 onChange={handleDeadlineOptionChange}
                 label="Дедлайн (опция)"
-                disabled={isCritical} // Disable if critical
+                disabled={isCritical} 
               >
                 <MenuItem value="twoHours">+2 часа</MenuItem>
                 <MenuItem value="today">Сегодня (до 17:30)</MenuItem>
@@ -270,15 +290,15 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
                 InputLabelProps={{
                   shrink: true,
                 }}
-                disabled={isCritical} // Disable if critical
+                disabled={isCritical} 
               />
             )}
 
             <FormControl fullWidth error={!users || users.length === 0}>
               <InputLabel>Исполнитель *</InputLabel>
               <Select
-                name="executor"
-                value={taskData.executor}
+                name="executorId"
+                value={taskData.executorId}
                 onChange={handleChange}
                 label="Исполнитель *"
                 required
@@ -303,9 +323,9 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             <FormControl fullWidth>
               <InputLabel>Участники (опционально)</InputLabel>
               <Select
-                name="participants"
+                name="participantIds"
                 multiple
-                value={taskData.participants}
+                value={taskData.participantIds}
                 onChange={handleChange}
                 label="Участники (опционально)"
               >
@@ -324,9 +344,9 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             <FormControl fullWidth>
               <InputLabel>Наблюдатели (опционально)</InputLabel>
               <Select
-                name="observers"
+                name="observerIds"
                 multiple
-                value={taskData.observers}
+                value={taskData.observerIds}
                 onChange={handleChange}
                 label="Наблюдатели (опционально)"
               >
@@ -349,7 +369,7 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             onClick={handleNextStep} 
             variant="contained" 
             color="primary"
-            disabled={!taskData.title || !taskData.executor}
+            disabled={!taskData.title || !taskData.executorId}
           >
             Далее
           </Button>
@@ -364,14 +384,14 @@ const TaskModal = ({ open, onClose, onSubmit, users }) => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span><strong>Название:</strong> {taskData.title}</span>
-                <span><strong>Тип:</strong> {TASK_TYPE_LABELS[taskData.task_type] || taskData.task_type}</span>
+                <span><strong>Тип:</strong> {TASK_TYPE_LABELS[taskData.taskType] || taskData.taskType}</span>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span><strong>Приоритет:</strong> {PRIORITY_LABELS[taskData.priority] || taskData.priority}</span>
                 <span><strong>Дедлайн:</strong> {new Date(taskData.deadline).toLocaleString('ru-RU')}</span>
               </Box>
               <Box>
-                <strong>Исполнитель:</strong> {users && users.find(user => user.id === taskData.executor)?.full_name || 'Не назначен'}
+                <strong>Исполнитель:</strong> {users && users.find(user => user.id === taskData.executorId)?.full_name || 'Не назначен'}
               </Box>
             </Box>
 
