@@ -1,7 +1,7 @@
 // --- ИМПОРТЫ ---
 import React, { useState } from 'react';
 // Импорты компонентов Material UI для построения интерфейса карточки
-import { Card, CardContent, Typography, Box, Tooltip, Divider, Button, CircularProgress, Link as MuiLink } from '@mui/material';
+import { Card, CardContent, Typography, Box, Tooltip, Divider, Button, CircularProgress, Link as MuiLink, IconButton } from '@mui/material';
 // Импорт Link из react-router-dom для навигации
 import { Link as RouterLink } from 'react-router-dom';
 // Импорт сконфигурированного экземпляра axios для API-запросов
@@ -22,6 +22,35 @@ import {
   getStatusIcon,
   getTaskTypeLabel
 } from '../../utils/taskUtils.js';
+// Импорт темы Material UI
+import { useTheme } from '@mui/material/styles';
+// Импорт библиотеки date-fns для форматирования дат
+import formatDateFns from 'date-fns/format';
+// Импорт русской локали для date-fns
+import ru from 'date-fns/locale/ru';
+
+// --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ (УРОВЕНЬ МОДУЛЯ) ---
+// Форматирует дату и время в удобочитаемый вид (дд.мм.гг)
+const formatDateTimeModule = (dateTimeString) => {
+  if (!dateTimeString) return 'N/A';
+  try {
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) {
+      // Попытка распарсить как ISO строку, если стандартный парсинг не удался
+      const isoDateString = dateTimeString.includes(' ') ? dateTimeString.replace(' ', 'T') : dateTimeString;
+      const parsedDate = new Date(isoDateString);
+      if (isNaN(parsedDate.getTime())) {
+        console.warn(`Invalid date/time string received, unable to parse: ${dateTimeString}`);
+        return 'Некорр. дата';
+      }
+      return formatDateFns(parsedDate, 'dd.MM.yy', { locale: ru });
+    }
+    return formatDateFns(date, 'dd.MM.yy', { locale: ru });
+  } catch (error) {
+    console.error("Error formatting date with formatDateTimeModule:", error, "Input:", dateTimeString);
+    return "Ошибка даты";
+  }
+};
 
 // --- КОМПОНЕНТ TaskCard ---
 // task: объект задачи
@@ -73,12 +102,16 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
     setIsAccepting(true); // Устанавливаем флаг загрузки
     try {
       // API-запрос на изменение статуса задачи на 'accepted'
-      await api.patch(`/api/tasks/${task.id}/`, { status: 'accepted' });
-      console.log(`Task ${task.id} status changed to accepted.`);
+      const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'accepted' });
+      const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
+      
       // Если есть функция обратного вызова, вызываем ее для обновления UI
-      if (onTaskUpdate) onTaskUpdate(task.id, { ...task, status: 'accepted' });
+      if (onTaskUpdate) {
+        onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
+      }
     } catch (err) {
       console.error(`Error updating task ${task.id} to accepted:`, err);
+      // Здесь можно добавить обработку ошибок, например, показать уведомление пользователю
     } finally {
       setIsAccepting(false); // Сбрасываем флаг загрузки
       setIsCreateDateHovered(false); // Сбрасываем состояние наведения (чтобы кнопка скрылась)
@@ -93,11 +126,15 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
     setIsCompleting(true);
     try {
       // API-запрос на изменение статуса задачи на 'completed'
-      await api.patch(`/api/tasks/${task.id}/`, { status: 'completed' });
-      console.log(`Task ${task.id} status changed to completed.`);
-      if (onTaskUpdate) onTaskUpdate(task.id, { ...task, status: 'completed' });
+      const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'completed' });
+      const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
+      
+      if (onTaskUpdate) {
+        onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
+      }
     } catch (err) {
       console.error(`Error updating task ${task.id} to completed:`, err);
+      // Здесь можно добавить обработку ошибок, например, показать уведомление пользователю
     } finally {
       setIsCompleting(false);
       setIsDeadlineHovered(false);
@@ -129,6 +166,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
           opacity: 0.6,
           backgroundColor: 'rgba(162, 162, 162, 0.83)',
         }),
+        border: task.task_type === 'step' ? '2px solid #FFC107' : undefined, // Желтая рамка
       }}
       // Клик по карточке ведет на страницу задачи
       onClick={() => {
@@ -424,3 +462,91 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
 };
 
 export default TaskCard;
+
+// --- НОВЫЙ КОМПОНЕНТ CompactTaskCard ---
+export const CompactTaskCard = ({ task, onClick }) => {
+  const theme = useTheme();
+  if (!task) return null;
+
+  const StatusIconComponent = getStatusIcon(task.status);
+  const taskTypeLabel = getTaskTypeLabel(task.task_type);
+  const statusLabelText = getStatusLabel(task.status);
+  const dateToFormat = task.status_updated_at || task.updated_at;
+  const updatedDate = formatDateTimeModule(dateToFormat);
+
+  const actualColorForContrastCalculation = theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300];
+  const cardSxBgStyle = actualColorForContrastCalculation;
+  
+  let iconAndButtonTextColor;
+  try {
+    iconAndButtonTextColor = theme.palette.getContrastText(actualColorForContrastCalculation);
+  } catch (error) {
+    console.warn(`CompactTaskCard: Could not get contrast text for '${actualColorForContrastCalculation}'. Falling back to theme's primary text color.`, error);
+    iconAndButtonTextColor = theme.palette.text.primary;
+  }
+
+  const verticalTextStyle = {
+    writingMode: 'vertical-rl',
+    textOrientation: 'mixed',
+    transform: 'rotate(180deg)',
+    whiteSpace: 'nowrap',
+    fontSize: '0.7rem',
+    fontWeight: 500,
+    textAlign: 'center',
+    color: theme.palette.text.secondary,
+    padding: '4px 0', 
+  };
+
+  return (
+    <Card
+      sx={{
+        width: '30px',
+        height: '150px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 0px', 
+        backgroundColor: cardSxBgStyle,
+        border: `1px solid ${theme.palette.divider}`,
+        boxSizing: 'border-box',
+        overflow: 'hidden', 
+        cursor: 'pointer',
+        '&:hover': {
+          boxShadow: theme.shadows[3], 
+        }
+      }}
+      onClick={onClick} 
+    >
+      <Tooltip title={`${statusLabelText} - ${updatedDate}`} placement="top">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', paddingTop: '4px' }}>
+          {StatusIconComponent ? React.cloneElement(StatusIconComponent, {
+            sx: { 
+              fontSize: '1.25rem', 
+              color: iconAndButtonTextColor
+            }
+          }) : <Box sx={{width: '1.25rem', height: '1.25rem'}} /> /* Placeholder if no icon */}
+        </Box>
+      </Tooltip>
+
+      <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', overflow: 'hidden' }}>
+        <Typography sx={verticalTextStyle}>
+          {taskTypeLabel}
+        </Typography>
+      </Box>
+
+      <Tooltip title="Детали задачи" placement="bottom">
+        <IconButton 
+          size="small" 
+          sx={{ 
+            padding: '4px', 
+            marginBottom: '4px',
+            color: iconAndButtonTextColor
+          }}
+        >
+          <InfoOutlinedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Card>
+  );
+};

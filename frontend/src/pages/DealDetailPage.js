@@ -16,6 +16,7 @@ import DealHistory from '../components/deals/DealHistory';
 import MyEvents from '../components/common/MyEvents.jsx';
 import GeneralFeed from '../components/common/GeneralFeed';
 import eventBus from '../utils/eventBus';
+import { createTask } from '../components/tasks/TaskCreator';
 
 const DealDetailPage = () => {
   const { id } = useParams();         // Считываем ID сделки из URL
@@ -357,7 +358,7 @@ const DealDetailPage = () => {
             const nextStepResponse = await api.post("/api/next-steps/", {
               deal: deal.id,
               description: nextStepText,
-              deadline: nextStepDateTime,
+              deadline: nextStepDateTime, // Исходная строка от datetime-local
               event: eventId,
             });
             // Обновляем локальные данные
@@ -371,6 +372,43 @@ const DealDetailPage = () => {
             }));
             setLastNextStepDue(nextStepDateTime);
             await fetchDealEvents();
+
+            // ---- НАЧАЛО НОВОГО КОДА ДЛЯ СОЗДАНИЯ ЗАДАЧИ ----
+            try {
+              const taskDetails = {
+                title: `${deal.name} - Следующий шаг`,
+                description: nextStepText,
+                dealId: deal.id,
+                taskType: 'step',
+                deadline: nextStepDateTime ? new Date(nextStepDateTime).toISOString() : null,
+                executorId: deal.responsible?.id, // Используем deal.responsible.id
+                priority: 'low',
+                status: 'not_accepted',
+              };
+              const createdTask = await createTask(taskDetails);
+              
+              // Отправляем событие для TasksArea, чтобы он обновил список задач
+              if (createdTask && createdTask.id && deal && deal.id) {
+                eventBus.dispatch('taskAutomaticallyCreated', { 
+                  dealId: deal.id, // Используем deal.id из текущего контекста DealDetailPage
+                  taskId: createdTask.id 
+                });
+              } else {
+                if (deal && deal.id) {
+                    eventBus.dispatch('taskAutomaticallyCreated', { 
+                        dealId: deal.id,
+                        taskId: createdTask?.id || null 
+                    });
+                } else {
+                    console.error('DealDetailPage: Не удалось отправить событие taskAutomaticallyCreated. Отсутствует deal.id.');
+                }
+              }
+
+            } catch (taskError) {
+              console.error("Ошибка при автоматическом создании задачи для следующего шага:", taskError);
+            }
+            // ---- КОНЕЦ НОВОГО КОДА ДЛЯ СОЗДАНИЯ ЗАДАЧИ ----
+
             // Сброс формы и закрытие попапа
             setEventText("");
             setEventType("comment");

@@ -1,6 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Box, Divider } from '@mui/material';
 import TasksArea from '../tasks/TasksArea';
+import TaskCard, { CompactTaskCard } from '../tasks/TaskCard';
+import { useNavigate } from 'react-router-dom';
 
 const CentralWorkBar = ({
   deal,
@@ -22,6 +24,17 @@ const CentralWorkBar = ({
       ta.style.height = ta.scrollHeight + 'px';
     }
   }, [eventText]);
+
+  const navigate = useNavigate();
+
+  const handleNavigateToTask = useCallback((task) => {
+    if (task && task.id) {
+      navigate(`/tasks/${task.id}`);
+    }
+  }, [navigate]);
+
+  // Фильтр для активных задач (все, что не 'closed')
+  const activeTasksFilter = useCallback((task) => task.status !== 'closed', []);
 
   return (
     <Box sx={{ width: '100%', px: 0.5 }}>
@@ -91,7 +104,27 @@ const CentralWorkBar = ({
             </p>
           </div>
         </div>
-        <TasksArea deal={deal} />
+        {/* Область для активных задач */}
+        <TasksArea 
+          key="active-tasks"
+          deal={deal} 
+          title="Активные задачи" 
+          clientSideFilter={activeTasksFilter} 
+          CardComponent={TaskCard} 
+        />
+
+        {/* Область для закрытых задач (Архив) */}
+        <TasksArea 
+          key="archive-tasks"
+          deal={deal} 
+          title="Архив задач" 
+          apiStatusFilter="closed" 
+          CardComponent={CompactTaskCard} 
+          onCardClick={handleNavigateToTask}
+          showAddTaskButton={false}
+          titleVariant='subtitle1'
+          gridSpacing={1}
+        />
       </main>
     </Box>
   );

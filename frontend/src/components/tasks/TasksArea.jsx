@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Box, Typography, IconButton, Grid, Card, CardContent, Chip, CircularProgress, Divider, Tooltip, useTheme } from '@mui/material';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { Box, Typography, IconButton, Card, CardContent, Chip, CircularProgress, Divider, Tooltip, useTheme, Alert } from '@mui/material';
 import api from '../../api/config'; // Импортируем наш экземпляр api
 import AddIcon from '@mui/icons-material/Add';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -24,77 +24,125 @@ import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Новый и
 import { addParticipantToDealIfNeeded } from '../../api/deals'; // <-- Добавлен импорт
 import eventBus from '../../utils/eventBus'; // <-- Добавлен импорт eventBus
 
-// Ленивая загрузка модального окна, чтобы избежать циклических зависимостей
-// const TaskModal = lazy(() => import('./TaskModal'));
-
 const getTaskTypeLabel = (taskType) => {
   return TASK_TYPE_LABELS[taskType] || 'Неизвестный тип';
 };
 
-const TasksArea = ({ deal }) => {
+const TasksArea = ({
+  deal,
+  title = "Задачи", 
+  apiStatusFilter = null, 
+  clientSideFilter = null, 
+  CardComponent = TaskCard, 
+  onCardClick = null, 
+  showAddTaskButton = true, 
+  titleVariant = 'h6',      
+  gridSpacing = 1,        
+}) => {
   const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Загружаем задачи для текущей сделки
-  useEffect(() => {
-    if (deal?.id) {
-      setIsLoading(true);
-      api.get(`/api/tasks/?deal=${deal.id}`)
-        .then(response => {
-          setTasks(response.data);
-          setError(null);
-        })
-        .catch(error => {
-          console.error("Ошибка при загрузке задач:", error);
-          setError('Не удалось загрузить задачи.');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-
-      // Загружаем список пользователей для модального окна
-      api.get('/api/users/')
-        .then(response => {
-          setUsers(response.data);
-        })
-        .catch(error => {
-          console.error("Ошибка при загрузке пользователей:", error);
-          // Можно установить состояние ошибки для пользователей, если это необходимо
-        });
-    } else {
-      setTasks([]); // Очищаем задачи, если сделка не выбрана
-      setIsLoading(false);
-    }
-  }, [deal?.id]);
-
-  // Функция для обновления статуса задачи в UI
-  const handleTaskStatusUpdate = (taskId, updatedTask) => {
-    setTasks(prevTasks => 
-      prevTasks.map(t => 
-        t.id === taskId ? updatedTask : t
-      )
-    );
-  };
-
-  // Загрузка текущего пользователя
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Загрузка текущего пользователя
   useEffect(() => {
-    // console.log('Попытка загрузить текущего пользователя...');
-    api.get('/api/auth/me', { withCredentials: true })
-      .then(response => {
-        // console.log('Текущий пользователь загружен:', response.data);
-        setCurrentUser(response.data);
-      })
-      .catch(error => {
-        console.error("Ошибка загрузки текущего пользователя:", error);
+    if (showAddTaskButton && deal?.id) {
+      api.get('/api/users/')
+        .then(response => setUsers(response.data))
+        .catch(err => console.error("Ошибка загрузки пользователей:", err));
+      
+      api.get('/api/auth/me', { withCredentials: true })
+        .then(response => setCurrentUser(response.data))
+        .catch(err => console.error("Ошибка загрузки текущего пользователя:", err));
+    } else {
+      setUsers([]);
+      setCurrentUser(null);
+    }
+  }, [showAddTaskButton, deal?.id]);
+
+  // Функция для загрузки задач
+  const fetchTasks = useCallback(async (currentDealId) => {
+    if (!currentDealId) {
+      setTasks([]);
+      setIsLoading(false);
+      setError(null); // Сбрасываем ошибку, если ID сделки нет
+      return;
+    }
+    setIsLoading(true); // ВРЕМЕННО ЗАКОММЕНТИРОВАТЬ
+    setError(null);
+    try {
+      let apiUrl = `/api/tasks/?deal=${currentDealId}`;
+      if (apiStatusFilter) {
+        apiUrl += `&status=${apiStatusFilter}`;
+      }
+      const response = await api.get(apiUrl);
+      let fetchedTasks = response.data || [];
+
+      if (clientSideFilter) {
+        fetchedTasks = fetchedTasks.filter(clientSideFilter);
+      }
+      
+      fetchedTasks.sort((a, b) => {
+        const aDeadline = a.deadline ? new Date(a.deadline) : null;
+        const bDeadline = b.deadline ? new Date(b.deadline) : null;
+
+        if (!aDeadline && !bDeadline) return 0; 
+        if (!aDeadline) return -1; 
+        if (!bDeadline) return 1;  
+        
+        return aDeadline - bDeadline; 
       });
-  }, []);
+
+      setTasks(fetchedTasks);
+    } catch (err) {
+      console.error("Ошибка при загрузке задач:", err);
+      setError("Не удалось загрузить задачи. Попробуйте позже.");
+      setTasks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiStatusFilter, clientSideFilter]);
+
+  // Загружаем задачи для текущей сделки при изменении deal.id
+  useEffect(() => {
+    fetchTasks(deal?.id);
+  }, [deal?.id, fetchTasks]);
+
+  // Подписка на событие создания новой задачи
+  useEffect(() => {
+    // Создаем конкретную функцию-обработчик для event listener
+    const eventHandler = (eventData) => {
+      // Проверяем, что событие содержит ID сделки и что оно соответствует текущей открытой сделке
+      if (eventData && eventData.dealId && deal?.id && eventData.dealId === deal.id) {
+        fetchTasks(deal.id);
+      } else if (eventData && eventData.dealId && deal?.id && eventData.dealId !== deal.id) {
+      }
+    };
+
+    eventBus.on('taskAutomaticallyCreated', eventHandler);
+    eventBus.on('taskManuallyCreated', eventHandler); 
+    eventBus.on('taskUpdated', eventHandler); 
+
+    // Отписка от события при размонтировании компонента
+    return () => {
+      eventBus.remove('taskAutomaticallyCreated', eventHandler); 
+      eventBus.remove('taskManuallyCreated', eventHandler);
+      eventBus.remove('taskUpdated', eventHandler);
+    };
+  }, [deal?.id, fetchTasks]); // Добавляем deal?.id и fetchTasks в зависимости, чтобы обработчик всегда имел актуальные данные
+
+  // Функция для обновления статуса задачи в UI
+  const handleTaskStatusUpdate = (updatedTask) => { 
+    setTasks(prevTasks => {
+      const newTasks = prevTasks.map(t => 
+        t.id === updatedTask.id ? updatedTask : t 
+      );
+      return newTasks;
+    });
+    eventBus.dispatch('taskUpdated', updatedTask);
+  };
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -169,28 +217,45 @@ const TasksArea = ({ deal }) => {
     return icons[priority] || null;
   };
 
-  return (
-    <div className="p-2">
-      <Box sx={{display: 'flex', alignItems: 'center' }}>
+  // Если нет сделки и кнопка добавления не отображается, то компонент не рендерим
+  // или если нет сделки, но кнопка должна быть, то показываем сообщение о необходимости выбрать сделку
+  if (!deal?.id && !showAddTaskButton) {
+    return null; 
+  }
+  if (!deal?.id && showAddTaskButton) {
+    return (
+      <Box sx={{ mt: 2, p: 2, backgroundColor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
+        <Typography variant={titleVariant} gutterBottom component="div">
+          {title}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Выберите или создайте сделку, чтобы добавить или просмотреть задачи.
+        </Typography>
+      </Box>
+    );
+  }
 
-        <Box sx={{ mr: 2, alignItems: 'center' }}>
-          <Typography variant="h6" component="h2">
-            Задачи <IconButton
+  return (
+    // Обертка Box вместо div для лучшей интеграции с MUI и применения sx
+    <Box sx={{ mt: 2, p: 2, backgroundColor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant={titleVariant} component="div" sx={{ mb: 0 }}> {/* Используем titleVariant */}
+          {title}
+        </Typography>
+        {showAddTaskButton && deal?.id && ( /* Условие для кнопки */
+          <Tooltip title="Добавить задачу">
+            <IconButton 
               color="primary"
               onClick={handleOpenModal}
-              disabled={!deal?.id}
+              size="small" // Делаем иконку немного меньше
               aria-label="Добавить задачу"
-            > <AddIcon />
+            >
+              <AddIcon />
             </IconButton>
-          </Typography>
-        </Box>
-        
-        <Box sx={{ mr: 2 }}>фильтр 1</Box>
-        <Box sx={{ mr: 2 }}>фильтр 2</Box>
-        <Box sx={{ mr: 2 }}>фильтр 3 </Box>
-
+          </Tooltip>
+        )}
       </Box>
-
+      
       <Divider sx={{ my: 1, mt: 0 }} />
 
       {error && (
@@ -204,31 +269,58 @@ const TasksArea = ({ deal }) => {
           Загрузка...
         </Box>
       ) : tasks.length > 0 ? (
-        <Grid container spacing={1}>
-          {tasks.map(task => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={task.id}>
-              <TaskCard task={task} onTaskUpdate={handleTaskStatusUpdate} />
-            </Grid>
+        <Box 
+          sx={{
+            display: 'flex',       // Включаем flexbox
+            flexDirection: 'row',  // Элементы в ряд
+            overflowX: 'auto',     // Горизонтальный скролл
+            overflowY: 'hidden',   // Скрыть вертикальный скролл
+            mt: 0.5,               // Сохраняем отступ сверху
+            pb: 1,                 // Отступ снизу для полосы прокрутки
+            gap: theme.spacing(gridSpacing), // Промежуток между карточками
+            // pt: 1, py: 1 // Можно добавить, если нужен общий вертикальный отступ для содержимого скролл-контейнера
+          }}
+        >
+          {tasks.map((task) => (
+            <Box 
+              key={task.id}
+              sx={{
+                flexShrink: 0,     // Запрещаем сжатие карточки
+                pt: 0.5,           // Сохраняем вертикальные отступы для самой карточки
+                pb: 0.5
+              }}
+            >
+              <CardComponent 
+                task={task} 
+                onTaskUpdate={handleTaskStatusUpdate} 
+                onDeleteTask={() => {}}
+                // Для CompactTaskCard передаем onCardClick, если он есть
+                {...(CardComponent.name === 'CompactTaskCard' && onCardClick ? { onClick: () => onCardClick(task) } : {})}
+              />
+            </Box>
           ))}
-        </Grid>
+        </Box>
       ) : (
         <Box sx={{ textAlign: 'center', py: 4, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-          {deal?.id ? 'Задачи отсутствуют. Создайте первую задачу.' : 'Сначала выберите сделку.'}
+          {apiStatusFilter === 'closed' ? 'Архив задач пуст.' : 'Задачи отсутствуют.'}
         </Box>
       )}
 
-      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>}>
-        {isModalOpen && (
-          <TaskModal
-            open={isModalOpen}
-            onClose={handleCloseModal}
-            onSubmit={handleTaskCreated} // <--- Используем новую функцию
-            users={users}
-            dealId={deal?.id}
-          />
-        )}
-      </Suspense>
-    </div>
+      {showAddTaskButton && deal?.id && ( /* Условие для модального окна */
+        <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>}>
+          {isModalOpen && (
+            <TaskModal
+              open={isModalOpen}
+              onClose={handleCloseModal}
+              onSubmit={handleTaskCreated}
+              users={users}
+              dealId={deal.id} 
+              currentUser={currentUser}
+            />
+          )}
+        </Suspense>
+      )}
+    </Box>
   );
 };
 
