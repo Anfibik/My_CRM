@@ -1,6 +1,6 @@
-from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser
-from django.utils import timezone
+from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser, Task
 import datetime
+from django.utils import timezone
 
 
 def convert_inquiry(inquiry: Inquiry, department_assignments=None):
@@ -80,18 +80,63 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
             description="Связаться с клиентом",
             deadline=deal.created_at + datetime.timedelta(hours=2)
         )
+        # Формируем контент для DealEvent и Task
+        deal_event_content = f"Переданно от колл-центра. {inquiry.need_description}"
+
         # Создаем событие по сделке
         DealEvent.objects.create(
             deal=deal,
             pipeline=deal.status,
             event_type="first_contact",
-            content=f"Переданно от колл-центра. {inquiry.need_description}",
+            content=deal_event_content, 
             next_step=next_step,
             created_by=inquiry.responsible
         )
+        
+        # Создаем задачу по аналогии со следующим шагом
+        if deal.responsible: 
+            Task.objects.create(
+                deal=deal,
+                title=f"{next_step.description} (авто)", 
+                description=deal_event_content,        
+                deadline=next_step.deadline,           
+                task_type="step",                      
+                priority="high",                       
+                status="pending",                      
+                author=inquiry.responsible,            
+                executor=deal.responsible              
+            )
 
     # (Необязательно) Обновляем статус обращения, например, помечаем его как "закрыто"
     inquiry.status = "in_progress"
     inquiry.save()
 
-    return lead  # или можно вернуть все созданные объекты
+    return lead  
+
+# Функции для определения рабочих дней и интервалов для задач
+def get_workday_task_interval(target_date):
+    """
+    Если target_date - рабочий день (Пн-Пт), возвращает интервал [9:00, 18:00) этого дня.
+    В противном случае возвращает None.
+    Даты возвращаются с учетом текущей таймзоны Django.
+    """
+    if target_date.weekday() >= 5:  # 0-Пн, 1-Вт, ..., 5-Сб, 6-Вс
+        return None
+
+    current_tz = timezone.get_current_timezone()
+    start_datetime_naive = datetime.datetime.combine(target_date, datetime.time(9, 0, 0))
+    end_datetime_naive = datetime.datetime.combine(target_date, datetime.time(18, 0, 0))
+
+    start_datetime_aware = timezone.make_aware(start_datetime_naive, current_tz)
+    end_datetime_aware = timezone.make_aware(end_datetime_naive, current_tz)
+
+    return start_datetime_aware, end_datetime_aware
+
+def get_next_workday_date(reference_date):
+    """
+    Находит следующую дату, которая является рабочим днем (Пн-Пт), начиная с reference_date + 1 день.
+    """
+    next_day = reference_date + datetime.timedelta(days=1)
+    while next_day.weekday() >= 5:
+        next_day += datetime.timedelta(days=1)
+    return next_day

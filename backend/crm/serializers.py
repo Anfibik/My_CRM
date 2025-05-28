@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment
 from .models import ROLE_CHOICES
+from django.utils import timezone
+from .services import get_workday_task_interval, get_next_workday_date
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -136,10 +138,37 @@ class DealSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     account_details = CustomUserSerializer(source='account', read_only=True)
+    depth_count = serializers.SerializerMethodField()
+    open_tasks_count = serializers.SerializerMethodField()
+    has_open_task_due_current_working_day = serializers.SerializerMethodField()
+    has_open_task_due_next_working_day = serializers.SerializerMethodField()
 
     class Meta:
         model = Deal
-        fields = '__all__'
+        fields = [
+            # Основные поля модели из Deal
+            'id', 
+            'name', 
+            'contract_amount',  # Ранее 'budget', теперь соответствует модели
+            'status',
+            'validated_need',   
+            'created_at',       
+            'department',       
+            
+            # Явно объявленные вложенные сериализаторы и SerializerMethodFields (эти остаются)
+            'lead',
+            'responsible',
+            'participants',
+            'participants_details',
+            'account',
+            'account_details',
+            'last_event',
+            'last_next_step',
+            'depth_count',
+            'open_tasks_count',
+            'has_open_task_due_current_working_day',
+            'has_open_task_due_next_working_day'
+        ]
 
     def get_last_event(self, obj):
         last_event = DealEvent.objects.filter(deal=obj).order_by('-created_at').first()
@@ -148,6 +177,39 @@ class DealSerializer(serializers.ModelSerializer):
     def get_last_next_step(self, obj):
         last_step = NextStep.objects.filter(deal=obj).order_by('-created_at').first()
         return last_step.description if last_step else None
+
+    def get_depth_count(self, obj):
+        return DealEvent.objects.filter(deal=obj, next_step__isnull=False).count()
+
+    def get_open_tasks_count(self, obj):
+        return Task.objects.filter(deal=obj).exclude(status='closed').count()
+
+    def get_has_open_task_due_current_working_day(self, obj):
+        today_local = timezone.localdate(timezone.now())
+        current_workday_interval = get_workday_task_interval(today_local)
+
+        if current_workday_interval:
+            start_dt, end_dt = current_workday_interval
+            return Task.objects.filter(
+                deal=obj, 
+                deadline__gte=start_dt, 
+                deadline__lt=end_dt
+            ).exclude(status='closed').exists()
+        return False
+
+    def get_has_open_task_due_next_working_day(self, obj):
+        today_local = timezone.localdate(timezone.now())
+        next_workday = get_next_workday_date(today_local)
+        next_workday_interval = get_workday_task_interval(next_workday)
+
+        if next_workday_interval: 
+            start_dt, end_dt = next_workday_interval
+            return Task.objects.filter(
+                deal=obj, 
+                deadline__gte=start_dt, 
+                deadline__lt=end_dt
+            ).exclude(status='closed').exists()
+        return False
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):

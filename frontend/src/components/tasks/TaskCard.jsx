@@ -490,7 +490,7 @@ export const CompactTaskCard = ({ task, onClick }) => {
     textOrientation: 'mixed',
     transform: 'rotate(180deg)',
     whiteSpace: 'nowrap',
-    fontSize: '0.7rem',
+    fontSize: '0.5rem',
     fontWeight: 500,
     textAlign: 'center',
     color: theme.palette.text.secondary,
@@ -500,13 +500,14 @@ export const CompactTaskCard = ({ task, onClick }) => {
   return (
     <Card
       sx={{
-        width: '30px',
-        height: '150px',
+        width: '25px',
+        height: '100px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '4px 0px', 
+        padding: '4px 0px',
+        opacity: 0.6,
         backgroundColor: cardSxBgStyle,
         border: `1px solid ${theme.palette.divider}`,
         boxSizing: 'border-box',

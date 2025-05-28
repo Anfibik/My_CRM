@@ -1,6 +1,7 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import api from '../api/config';
 import { useNavigate, Link } from 'react-router-dom';
+import Badge from 'react-bootstrap/Badge';
 
 // Отображение человекопонятных названий статусов сделок
 const statusLabels = {
@@ -34,33 +35,19 @@ const DealListPage = () => {
     try {
       const response = await api.get('/api/deals/');
       const rawDeals = Array.isArray(response.data) ? response.data : response.data.results || [];
-      const dealsWithDepthAndTasks = await Promise.all(
-        rawDeals.map(async (deal) => {
-          try {
-            // Получаем события для подсчета глубины
-            const eventsRes = await api.get(`/api/deal-events/?deal=${deal.id}`);
-            const events = Array.isArray(eventsRes.data)
-              ? eventsRes.data
-              : eventsRes.data.results || [];
-            const depthCount = events.filter(ev => ev.next_step_details).length;
-            
-            // Получаем задачи для данной сделки
-            const tasksRes = await api.get(`/api/tasks/?deal=${deal.id}`);
-            const tasks = Array.isArray(tasksRes.data)
-              ? tasksRes.data
-              : tasksRes.data.results || [];
-            const tasksCount = tasks.length;
-            
-            return { ...deal, depth: depthCount, tasksCount: tasksCount };
-          } catch (err) {
-            console.error(`Ошибка при получении данных для сделки ${deal.id}:`, err);
-            return { ...deal, depth: 0, tasksCount: 0 };
-          }
-        })
-      );
-      setDeals(dealsWithDepthAndTasks);
+      
+      // Преобразуем сделки, используя новые поля depth_count и open_tasks_count с бэкенда
+      const processedDeals = rawDeals.map(deal => ({
+        ...deal,
+        depth: deal.depth_count ?? 0,       // Используем новое поле depth_count от бэкенда
+        tasksCount: deal.open_tasks_count ?? 0 // Используем новое поле open_tasks_count от бэкенда
+      }));
+
+      setDeals(processedDeals);
     } catch (error) {
       console.error("Ошибка при получении сделок:", error);
+      // Можно установить пустой массив или специальное состояние ошибки
+      setDeals([]); 
     } finally {
       setLoading(false);
     }
@@ -111,39 +98,62 @@ const DealListPage = () => {
             </tr>
           </thead>
           <tbody className="text-gray-600 text-sm font-light">
-            {deals.map((deal, idx) => (
-              <tr key={deal.id} className="border-b border-gray-200 hover:bg-gray-100 text-sm leading-tight h-8">
-                <td className="py-1 px-2 text-center">{idx + 1}</td>
-                <td className="py-1 px-3 text-left font-semibold">
-                  <Link to={`/deals/${deal.id}`} className="text-blue-500 hover:underline">
-                    <span style={{
-                      display: 'inline-block',
-                      maxWidth: '250px', // Ограничиваем максимальную ширину
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      verticalAlign: 'bottom' // Для лучшего выравнивания с иконками/другим текстом в строке, если есть
-                    }}>
-                      {deal.name || 'Без названия'}
-                    </span>
-                  </Link>
-                </td>
-                <td className="py-1 px-3 text-left">{`${new Date(deal.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${new Date(deal.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</td>
-                <td className="py-1 px-3 text-left">{deal.department || '—'}</td>
-                <td className="py-1 px-3 text-left">{deal.responsible ? deal.responsible.full_name : '—'}</td>
-                <td className={`py-1 px-3 text-left ${deal.status === 'need' ? 'text-red-500 font-semibold' : ''}`}>{statusLabels[deal.status] || deal.status}</td>
-                <td className="py-1 px-3 text-center">
-                  {deal.depth ?? 0}
-                </td>
-                <td className="py-1 px-3 text-center">
-                  <div className="flex justify-center items-center">
-                    <span className={`${deal.tasksCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-0.5 rounded-full text-xs font-medium`}>
-                      {deal.tasksCount ?? 0}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {deals.map((deal, idx) => {
+              // --- DEBUG LOG START ---
+              console.log(`[Deal Debug] Name: ${deal.name}, Data:`, deal);
+              // --- DEBUG LOG END ---
+              return (
+                <tr key={deal.id} className="border-b border-gray-200 hover:bg-gray-100 text-sm leading-tight h-8">
+                  <td className="py-1 px-2 text-center">{idx + 1}</td>
+                  <td className="py-1 px-3 text-left font-semibold">
+                    <Link to={`/deals/${deal.id}`} className="text-blue-500 hover:underline">
+                      <span style={{
+                        display: 'inline-block',
+                        maxWidth: '250px', // Ограничиваем максимальную ширину
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        verticalAlign: 'bottom' // Для лучшего выравнивания с иконками/другим текстом в строке, если есть
+                      }}>
+                        {deal.name || 'Без названия'}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="py-1 px-3 text-left">{`${new Date(deal.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${new Date(deal.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</td>
+                  <td className="py-1 px-3 text-left">{deal.department || '—'}</td>
+                  <td className="py-1 px-3 text-left">{deal.responsible ? deal.responsible.full_name : '—'}</td>
+                  <td className={`py-1 px-3 text-left ${deal.status === 'need' ? 'text-red-500 font-semibold' : ''}`}>{statusLabels[deal.status] || deal.status}</td>
+                  <td className="py-1 px-3 text-center">
+                    {deal.depth ?? 0}
+                  </td>
+                  <td className="py-1 px-3 text-center">
+                    <div className="flex justify-center items-center">
+                      {(() => {
+                        const openTasksCount = deal.tasksCount; 
+                        const dueToday = deal.has_open_task_due_current_working_day;
+                        const dueTomorrow = deal.has_open_task_due_next_working_day;
+
+                        let badgeColor = 'primary'; 
+
+                        if (openTasksCount === 0) {
+                          badgeColor = 'secondary'; 
+                        } else if (dueToday) {
+                          badgeColor = 'danger'; 
+                        } else if (dueTomorrow) {
+                          badgeColor = 'warning'; 
+                        }
+                        
+                        return typeof openTasksCount === 'number' && openTasksCount >= 0 ? (
+                          <Badge bg={badgeColor} pill>
+                            {openTasksCount}
+                          </Badge>
+                        ) : null; 
+                      })()}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
