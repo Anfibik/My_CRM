@@ -1,7 +1,6 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import api from '../api/config';
 import { useNavigate, Link } from 'react-router-dom';
-import Badge from 'react-bootstrap/Badge';
 
 // Отображение человекопонятных названий статусов сделок
 const statusLabels = {
@@ -133,20 +132,22 @@ const DealListPage = () => {
                         const dueToday = deal.has_open_task_due_current_working_day;
                         const dueTomorrow = deal.has_open_task_due_next_working_day;
 
-                        let badgeColor = 'primary'; 
+                        let indicatorClasses = 'inline-block px-2 py-0.5 text-xs font-semibold rounded-full leading-none'; // Базовые стили Tailwind
 
                         if (openTasksCount === 0) {
-                          badgeColor = 'secondary'; 
+                          indicatorClasses += ' bg-gray-500 text-white'; // Серый
                         } else if (dueToday) {
-                          badgeColor = 'danger'; 
+                          indicatorClasses += ' bg-red-600 text-white'; // Красный
                         } else if (dueTomorrow) {
-                          badgeColor = 'warning'; 
+                          indicatorClasses += ' bg-yellow-400 text-black'; // Желтый
+                        } else {
+                          indicatorClasses += ' bg-sky-600 text-white'; // Светло-синий для остальных случаев
                         }
                         
                         return typeof openTasksCount === 'number' && openTasksCount >= 0 ? (
-                          <Badge bg={badgeColor} pill>
+                          <span className={indicatorClasses}>
                             {openTasksCount}
-                          </Badge>
+                          </span>
                         ) : null; 
                       })()}
                     </div>
