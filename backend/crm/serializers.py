@@ -223,6 +223,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'work_phone',
             'work_email',
             'role',
+            'department',
             'password',
             'password2',
         ]

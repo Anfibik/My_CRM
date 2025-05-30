@@ -140,6 +140,7 @@ class NextStepDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class UserRegistrationView(generics.CreateAPIView):
+    permission_classes = [permissions.AllowAny]
     queryset = CustomUser.objects.all()
     serializer_class = UserRegistrationSerializer
 
@@ -168,6 +169,7 @@ class UserRegistrationView(generics.CreateAPIView):
 
 
 class UserLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
     def post(self, request):
         email = request.data.get("email")  # Изменено с work_email на email
         password = request.data.get("password")

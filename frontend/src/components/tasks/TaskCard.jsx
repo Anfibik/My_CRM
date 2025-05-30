@@ -24,6 +24,7 @@ import {
 } from '../../utils/taskUtils.js';
 // Импорт темы Material UI
 import { useTheme } from '@mui/material/styles';
+import InfoTooltipIcon from '../common/InfoTooltipIcon';
 // Импорт библиотеки date-fns для форматирования дат
 import formatDateFns from 'date-fns/format';
 // Импорт русской локали для date-fns
@@ -104,7 +105,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
       // API-запрос на изменение статуса задачи на 'accepted'
       const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'accepted' });
       const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
-      
+
       // Если есть функция обратного вызова, вызываем ее для обновления UI
       if (onTaskUpdate) {
         onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
@@ -128,7 +129,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
       // API-запрос на изменение статуса задачи на 'completed'
       const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'completed' });
       const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
-      
+
       if (onTaskUpdate) {
         onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
       }
@@ -140,6 +141,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
       setIsDeadlineHovered(false);
     }
   };
+
 
   // --- JSX РАЗМЕТКА КАРТОЧКИ ---
   return (
@@ -342,50 +344,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
 
           {/* Иконка информации с всплывающей подсказкой (название и описание задачи) */}
           <Box sx={{ flexBasis: '10%', textAlign: 'center' }}>
-            <Tooltip
-              title={ // Содержимое всплывающей подсказки
-                <React.Fragment>
-                  <Typography color="inherit" sx={{ fontWeight: 'bold', textAlign: 'center', mb: 0.5 }}>
-                    {task.title} {/* Название задачи */}
-                  </Typography>
-                  {task.description && <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.2)' }} />}
-                  <Typography variant="body2" sx={{ textAlign: 'left', whiteSpace: 'pre-wrap', maxHeight: '150px', overflowY: 'auto' }}>
-                    {task.description || "Описание отсутствует."} {/* Описание задачи */}
-                  </Typography>
-                </React.Fragment>
-              }
-              placement="top" // Позиционирование подсказки
-              arrow // Стрелка у подсказки
-              componentsProps={{ // Стили для самой подсказки и стрелки
-                tooltip: {
-                  sx: {
-                    maxWidth: 300,
-                    bgcolor: 'background.paper', // Фон подсказки
-                    color: 'text.primary',    // Цвет текста
-                    boxShadow: 3,
-                    p: 1.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  },
-                },
-                arrow: {
-                  sx: {
-                    color: 'background.paper',
-                    '&::before': {
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    },
-                  },
-                },
-              }}
-            >
-              <InfoOutlinedIcon sx={{
-                fontSize: '1.2rem',
-                cursor: 'pointer',
-                color: isTaskClosed ? 'text.disabled' : 'action.active',
-                '&:hover': { color: 'primary.main' }
-              }} />
-            </Tooltip>
+            <InfoTooltipIcon title={task.title} description={task.description} />
           </Box>
 
           {/* Блок с датой дедлайна / кнопкой "Завершить" */}
@@ -430,19 +389,19 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
           {task.deal && task.deal_details?.name ? ( // Если есть ID сделки и детали сделки (название)
             <Typography variant="caption" component="div" sx={{ fontSize: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {/* Ссылка на страницу сделки */}
-              <MuiLink 
+              <MuiLink
                 component={RouterLink} // Используем RouterLink для внутренней навигации
                 to={`/deals/${task.deal}`} // Путь к сделке
                 variant="caption"
-                sx={{ 
-                  fontSize: 'inherit', 
+                sx={{
+                  fontSize: 'inherit',
                   fontWeight: 'normal',
                   textDecoration: 'none',
                   color: 'text.primary', // Цвет ссылки
-                  '&:hover': { 
+                  '&:hover': {
                     textDecoration: 'underline',
                     color: 'text.primary',
-                  } 
+                  }
                 }}
                 onClick={(e) => e.stopPropagation()} // Предотвращаем всплытие события
               >
@@ -476,7 +435,7 @@ export const CompactTaskCard = ({ task, onClick }) => {
 
   const actualColorForContrastCalculation = theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300];
   const cardSxBgStyle = actualColorForContrastCalculation;
-  
+
   let iconAndButtonTextColor;
   try {
     iconAndButtonTextColor = theme.palette.getContrastText(actualColorForContrastCalculation);
@@ -494,7 +453,7 @@ export const CompactTaskCard = ({ task, onClick }) => {
     fontWeight: 500,
     textAlign: 'center',
     color: theme.palette.text.secondary,
-    padding: '4px 0', 
+    padding: '4px 0',
   };
 
   return (
@@ -511,22 +470,22 @@ export const CompactTaskCard = ({ task, onClick }) => {
         backgroundColor: cardSxBgStyle,
         border: `1px solid ${theme.palette.divider}`,
         boxSizing: 'border-box',
-        overflow: 'hidden', 
+        overflow: 'hidden',
         cursor: 'pointer',
         '&:hover': {
-          boxShadow: theme.shadows[3], 
+          boxShadow: theme.shadows[3],
         }
       }}
-      onClick={onClick} 
+      onClick={onClick}
     >
       <Tooltip title={`${statusLabelText} - ${updatedDate}`} placement="top">
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', paddingTop: '4px' }}>
           {StatusIconComponent ? React.cloneElement(StatusIconComponent, {
-            sx: { 
-              fontSize: '1.25rem', 
+            sx: {
+              fontSize: '1.25rem',
               color: iconAndButtonTextColor
             }
-          }) : <Box sx={{width: '1.25rem', height: '1.25rem'}} /> /* Placeholder if no icon */}
+          }) : <Box sx={{ width: '1.25rem', height: '1.25rem' }} /> /* Placeholder if no icon */}
         </Box>
       </Tooltip>
 
@@ -536,18 +495,14 @@ export const CompactTaskCard = ({ task, onClick }) => {
         </Typography>
       </Box>
 
-      <Tooltip title="Детали задачи" placement="bottom">
-        <IconButton 
-          size="small" 
-          sx={{ 
-            padding: '4px', 
-            marginBottom: '4px',
-            color: iconAndButtonTextColor
-          }}
-        >
-          <InfoOutlinedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
+
+      {/* Иконка информации с всплывающей подсказкой (название и описание задачи) */}
+      <Box sx={{ flexBasis: '10%', textAlign: 'center' }}>
+        <InfoTooltipIcon title={task.title} description={task.description} />
+      </Box>
+
+
+
     </Card>
   );
 };

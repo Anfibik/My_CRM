@@ -39,10 +39,10 @@ DEPARTMENT_CHOICES = [
     ("marketing", "Маркетинг"),
 ]
 
-phone_validator = RegexValidator(
-    regex=r'^\+?1?\d{9,15}$',
-    message="Номер телефона должен быть в формате: '+999999999'. До 15 цифр."
-)
+# phone_validator = RegexValidator(
+#     regex=r'^\+?1?\d{9,15}$',
+#     message="Номер телефона должен быть в формате: '+999999999'. До 15 цифр."
+# )
 
 
 class CustomUser(AbstractUser):
@@ -52,12 +52,10 @@ class CustomUser(AbstractUser):
         blank=True,
         null=True,
         verbose_name="Домашний телефон",
-        validators=[phone_validator]
     )
     work_phone = models.CharField(
         max_length=20,
         verbose_name="Рабочий телефон",
-        validators=[phone_validator]
     )
     work_email = models.EmailField(
         unique=True,
@@ -87,7 +85,7 @@ class CustomUser(AbstractUser):
 
 class Contact(models.Model):
     name = models.CharField(max_length=255, verbose_name="ФИО Контакта")
-    phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True, null=True, validators=[phone_validator])
+    phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True, null=True)
     email = models.EmailField(verbose_name="Email", blank=True, null=True)
     messenger = models.CharField(
         max_length=100,
@@ -108,7 +106,7 @@ class Contact(models.Model):
 class Company(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название компании")
     site = models.URLField(verbose_name="Сайт компании", blank=True, null=True)
-    phone = models.CharField(max_length=20, verbose_name="Телефон компании", blank=True, null=True, validators=[phone_validator])
+    phone = models.CharField(max_length=20, verbose_name="Телефон компании", blank=True, null=True)
     email = models.EmailField(verbose_name="Email компании", blank=True, null=True)
     industry = models.CharField(max_length=255, verbose_name="Направленность", blank=True, null=True)
     description = models.TextField(verbose_name="Описание компании", blank=True, null=True)
@@ -253,7 +251,7 @@ class Deal(models.Model):
 
 class Inquiry(models.Model):
     full_name = models.CharField(max_length=255, verbose_name="ФИО контакта")
-    phone = models.CharField(max_length=20, verbose_name="Телефон", validators=[phone_validator])
+    phone = models.CharField(max_length=20, verbose_name="Телефон")
     email = models.EmailField(verbose_name="Email", blank=True, null=True)
     messenger = models.CharField(
         max_length=100,

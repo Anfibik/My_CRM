@@ -2,10 +2,7 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { Box, Typography, IconButton, Card, CardContent, Chip, CircularProgress, Divider, Tooltip, useTheme, Alert } from '@mui/material';
 import api from '../../api/config'; // Импортируем наш экземпляр api
 import AddIcon from '@mui/icons-material/Add';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
 import DoneIcon from '@mui/icons-material/Done';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -13,15 +10,9 @@ import LoopIcon from '@mui/icons-material/Loop';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import ConstructionIcon from '@mui/icons-material/Construction';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import EditIcon from '@mui/icons-material/Edit';
-import WarningIcon from '@mui/icons-material/Warning';
-import TaskModal from './TaskModal'; 
-import TaskCard from './TaskCard.jsx'; 
+import TaskModal from './TaskModal';
+import TaskCard from './TaskCard.jsx';
 import { STATUS_LABELS, TASK_TYPE_LABELS } from '../../constants'; // Import constants
-import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Новый импорт
-import { addParticipantToDealIfNeeded } from '../../api/deals'; // <-- Добавлен импорт
 import eventBus from '../../utils/eventBus'; // <-- Добавлен импорт eventBus
 
 const getTaskTypeLabel = (taskType) => {
@@ -30,14 +21,14 @@ const getTaskTypeLabel = (taskType) => {
 
 const TasksArea = ({
   deal,
-  title = "Задачи", 
-  apiStatusFilter = null, 
-  clientSideFilter = null, 
-  CardComponent = TaskCard, 
-  onCardClick = null, 
-  showAddTaskButton = true, 
-  titleVariant = 'h6',      
-  gridSpacing = 1,        
+  title = "Задачи",
+  apiStatusFilter = null,
+  clientSideFilter = null,
+  CardComponent = TaskCard,
+  onCardClick = null,
+  showAddTaskButton = true,
+  titleVariant = 'h6',
+  gridSpacing = 1,
 }) => {
   const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,7 +43,7 @@ const TasksArea = ({
       api.get('/api/users/')
         .then(response => setUsers(response.data))
         .catch(err => console.error("Ошибка загрузки пользователей:", err));
-      
+
       api.get('/api/auth/me', { withCredentials: true })
         .then(response => setCurrentUser(response.data))
         .catch(err => console.error("Ошибка загрузки текущего пользователя:", err));
@@ -83,16 +74,16 @@ const TasksArea = ({
       if (clientSideFilter) {
         fetchedTasks = fetchedTasks.filter(clientSideFilter);
       }
-      
+
       fetchedTasks.sort((a, b) => {
         const aDeadline = a.deadline ? new Date(a.deadline) : null;
         const bDeadline = b.deadline ? new Date(b.deadline) : null;
 
-        if (!aDeadline && !bDeadline) return 0; 
-        if (!aDeadline) return -1; 
-        if (!bDeadline) return 1;  
-        
-        return aDeadline - bDeadline; 
+        if (!aDeadline && !bDeadline) return 0;
+        if (!aDeadline) return -1;
+        if (!bDeadline) return 1;
+
+        return aDeadline - bDeadline;
       });
 
       setTasks(fetchedTasks);
@@ -122,22 +113,22 @@ const TasksArea = ({
     };
 
     eventBus.on('taskAutomaticallyCreated', eventHandler);
-    eventBus.on('taskManuallyCreated', eventHandler); 
-    eventBus.on('taskUpdated', eventHandler); 
+    eventBus.on('taskManuallyCreated', eventHandler);
+    eventBus.on('taskUpdated', eventHandler);
 
     // Отписка от события при размонтировании компонента
     return () => {
-      eventBus.remove('taskAutomaticallyCreated', eventHandler); 
+      eventBus.remove('taskAutomaticallyCreated', eventHandler);
       eventBus.remove('taskManuallyCreated', eventHandler);
       eventBus.remove('taskUpdated', eventHandler);
     };
   }, [deal?.id, fetchTasks]); // Добавляем deal?.id и fetchTasks в зависимости, чтобы обработчик всегда имел актуальные данные
 
   // Функция для обновления статуса задачи в UI
-  const handleTaskStatusUpdate = (updatedTask) => { 
+  const handleTaskStatusUpdate = (updatedTask) => {
     setTasks(prevTasks => {
-      const newTasks = prevTasks.map(t => 
-        t.id === updatedTask.id ? updatedTask : t 
+      const newTasks = prevTasks.map(t =>
+        t.id === updatedTask.id ? updatedTask : t
       );
       return newTasks;
     });
@@ -186,7 +177,7 @@ const TasksArea = ({
       'not_accepted': <CancelIcon fontSize="small" />,
       'pending': <PauseCircleOutlineIcon fontSize="small" />,
       'accepted': <CheckCircleOutlineIcon fontSize="small" />,
-      'in_progress': <ConstructionIcon  fontSize="small" />,
+      'in_progress': <ConstructionIcon fontSize="small" />,
       'completed': <DoneIcon fontSize="small" />,
       'closed': <LockOutlinedIcon fontSize="small" />
     };
@@ -220,7 +211,7 @@ const TasksArea = ({
   // Если нет сделки и кнопка добавления не отображается, то компонент не рендерим
   // или если нет сделки, но кнопка должна быть, то показываем сообщение о необходимости выбрать сделку
   if (!deal?.id && !showAddTaskButton) {
-    return null; 
+    return null;
   }
   if (!deal?.id && showAddTaskButton) {
     return (
@@ -244,7 +235,7 @@ const TasksArea = ({
         </Typography>
         {showAddTaskButton && deal?.id && ( /* Условие для кнопки */
           <Tooltip title="Добавить задачу">
-            <IconButton 
+            <IconButton
               color="primary"
               onClick={handleOpenModal}
               size="small" // Делаем иконку немного меньше
@@ -255,7 +246,7 @@ const TasksArea = ({
           </Tooltip>
         )}
       </Box>
-      
+
       <Divider sx={{ my: 1, mt: 0 }} />
 
       {error && (
@@ -269,7 +260,7 @@ const TasksArea = ({
           Загрузка...
         </Box>
       ) : tasks.length > 0 ? (
-        <Box 
+        <Box
           sx={{
             display: 'flex',       // Включаем flexbox
             flexDirection: 'row',  // Элементы в ряд
@@ -282,7 +273,7 @@ const TasksArea = ({
           }}
         >
           {tasks.map((task) => (
-            <Box 
+            <Box
               key={task.id}
               sx={{
                 flexShrink: 0,     // Запрещаем сжатие карточки
@@ -290,10 +281,10 @@ const TasksArea = ({
                 pb: 0.5
               }}
             >
-              <CardComponent 
-                task={task} 
-                onTaskUpdate={handleTaskStatusUpdate} 
-                onDeleteTask={() => {}}
+              <CardComponent
+                task={task}
+                onTaskUpdate={handleTaskStatusUpdate}
+                onDeleteTask={() => { }}
                 // Для CompactTaskCard передаем onCardClick, если он есть
                 {...(CardComponent.name === 'CompactTaskCard' && onCardClick ? { onClick: () => onCardClick(task) } : {})}
               />
@@ -314,7 +305,7 @@ const TasksArea = ({
               onClose={handleCloseModal}
               onSubmit={handleTaskCreated}
               users={users}
-              dealId={deal.id} 
+              dealId={deal.id}
               currentUser={currentUser}
             />
           )}

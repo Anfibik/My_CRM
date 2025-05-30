@@ -92,7 +92,7 @@ const DealListPage = () => {
               <th className="py-3 px-6 text-left">Департамент</th>
               <th className="py-3 px-6 text-left">Ответственный</th>
               <th className="py-3 px-6 text-left">Статус</th>
-              <th className="py-3 px-6 text-center">Глубина</th>
+              {/* <th className="py-3 px-6 text-center">Глубина</th> */}
               <th className="py-3 px-6 text-center">Задачи</th>
             </tr>
           </thead>
@@ -122,9 +122,9 @@ const DealListPage = () => {
                   <td className="py-1 px-3 text-left">{deal.department || '—'}</td>
                   <td className="py-1 px-3 text-left">{deal.responsible ? deal.responsible.full_name : '—'}</td>
                   <td className={`py-1 px-3 text-left ${deal.status === 'need' ? 'text-red-500 font-semibold' : ''}`}>{statusLabels[deal.status] || deal.status}</td>
-                  <td className="py-1 px-3 text-center">
+                  {/* <td className="py-1 px-3 text-center">
                     {deal.depth ?? 0}
-                  </td>
+                  </td> */}
                   <td className="py-1 px-3 text-center">
                     <div className="flex justify-center items-center">
                       {(() => {
