@@ -506,3 +506,91 @@ export const CompactTaskCard = ({ task, onClick }) => {
     </Card>
   );
 };
+
+
+// --- Горизонтальные карточки задач для канбана---
+export const GorizontalCompactTaskCard = ({ task, onClick }) => {
+  const theme = useTheme();
+  if (!task) return null;
+
+  const StatusIconComponent = getStatusIcon(task.status);
+  const taskTypeLabel = getTaskTypeLabel(task.task_type);
+  const statusLabelText = getStatusLabel(task.status);
+  const dateToFormat = task.status_updated_at || task.updated_at;
+  const updatedDate = formatDateTimeModule(dateToFormat);
+
+  const actualColorForContrastCalculation = theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300];
+  const cardSxBgStyle = actualColorForContrastCalculation;
+
+  let iconAndButtonTextColor;
+  try {
+    iconAndButtonTextColor = theme.palette.getContrastText(actualColorForContrastCalculation);
+  } catch (error) {
+    console.warn(`CompactTaskCard: Could not get contrast text for '${actualColorForContrastCalculation}'. Falling back to theme's primary text color.`, error);
+    iconAndButtonTextColor = theme.palette.text.primary;
+  }
+
+  const verticalTextStyle = {
+    writingMode: 'vertical-rl',
+    textOrientation: 'mixed',
+    transform: 'rotate(180deg)',
+    whiteSpace: 'nowrap',
+    fontSize: '0.5rem',
+    fontWeight: 500,
+    textAlign: 'center',
+    color: theme.palette.text.secondary,
+    padding: '4px 0',
+  };
+
+  return (
+    <Card
+      sx={{
+        width: '100px',
+        height: '25px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 0px',
+        opacity: 0.6,
+        backgroundColor: cardSxBgStyle,
+        border: `1px solid ${theme.palette.divider}`,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        '&:hover': {
+          boxShadow: theme.shadows[3],
+        }
+      }}
+      onClick={onClick}
+    >
+      <Tooltip title={`${statusLabelText} - ${updatedDate}`} placement="top">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', paddingTop: '4px' }}>
+          {StatusIconComponent ? React.cloneElement(StatusIconComponent, {
+            sx: {
+              fontSize: '1.25rem',
+              color: iconAndButtonTextColor
+            }
+          }) : <Box sx={{ width: '1.25rem', height: '1.25rem' }} /> /* Placeholder if no icon */}
+        </Box>
+      </Tooltip>
+
+      <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', overflow: 'hidden' }}>
+        <Typography sx={verticalTextStyle}>
+          {taskTypeLabel}
+        </Typography>
+      </Box>
+
+
+      {/* Иконка информации с всплывающей подсказкой (название и описание задачи) */}
+      <Box sx={{ flexBasis: '10%', textAlign: 'center' }}>
+        <InfoTooltipIcon title={task.title} description={task.description} />
+      </Box>
+
+
+
+    </Card>
+  );
+};
+
+

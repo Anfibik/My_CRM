@@ -97,7 +97,7 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
         if deal.responsible: 
             Task.objects.create(
                 deal=deal,
-                title=f"{next_step.description} (авто)", 
+                title=f"{next_step.description}",
                 description=deal_event_content,        
                 deadline=next_step.deadline,           
                 task_type="step",                      

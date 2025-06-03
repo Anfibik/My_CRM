@@ -24,6 +24,7 @@ const InfoTooltipIcon = ({ title, description }) => {
           <Typography color="inherit" sx={{ fontWeight: 'bold', textAlign: 'center', mb: 0.5 }}>
             {title}
           </Typography>
+          <Divider sx={{ my: 1 }} />
           {description && <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.2)' }} />}
           <Typography variant="body2" sx={{ textAlign: 'left', whiteSpace: 'pre-wrap', maxHeight: '150px', overflowY: 'auto' }}>
             {description || "Описание отсутствует."}

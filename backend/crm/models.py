@@ -150,6 +150,7 @@ class Lead(models.Model):
         blank=True
     )
     department_assignments = models.JSONField(verbose_name="Ответственные", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания лида")
     status = models.CharField(
         max_length=20,
         choices=[

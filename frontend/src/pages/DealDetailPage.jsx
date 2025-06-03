@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api/config';
-import ContractAmountPopup from '../components/deals/ContractAmountPopup';
-import NextStepPopup from '../components/deals/NextStepPopup';
-import DealSidebar from '../components/deals/DealSidebar';
-import { getUsers } from '../api/users';
+import api from '../api/config.js';
+import ContractAmountPopup from '../components/deals/ContractAmountPopup.js';
+import NextStepPopup from '../components/deals/NextStepPopup.js';
+import DealSidebar from '../components/deals/DealSidebar.jsx';
+import { getUsers } from '../api/users.js';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import { Grid, Box, Tabs, Tab, Typography } from '@mui/material';
 import CentralWorkBar from '../components/deals/CentralWorkBar.jsx';
-import FileBar from '../components/common/FileBar';
+import FileBar from '../components/common/FileBar.jsx';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import DealHistory from '../components/deals/DealHistory';
+import DealHistory from '../components/deals/DealHistory.jsx';
 import MyEvents from '../components/common/MyEvents.jsx';
-import GeneralFeed from '../components/common/GeneralFeed';
-import eventBus from '../utils/eventBus';
-import { createTask } from '../components/tasks/TaskCreator';
+import GeneralFeed from '../components/common/GeneralFeed.jsx';
+import eventBus from '../utils/eventBus.js';
+import { createTask } from '../components/tasks/TaskCreator.js';
 
 const DealDetailPage = () => {
   const { id } = useParams();         // Считываем ID сделки из URL
