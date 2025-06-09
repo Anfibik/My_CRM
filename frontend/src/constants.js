@@ -96,3 +96,12 @@ export const ALL_STATUS_OPTIONS = createOptionsArray(STATUS_LABELS);
 
 // Используется для выпадающих списков ВЫБОРА статуса (без "Не принята")
 export const SELECTABLE_STATUS_OPTIONS = createOptionsArray(SELECTABLE_STATUS_LABELS);
+
+// Типы телефонных номеров
+export const PHONE_TYPE_LABELS = {
+  WORK_PRIMARY: "Рабочий (осн.)",
+  WORK_SECONDARY: "Рабочий (доп.)",
+  MOBILE: "Личный",
+};
+
+export const PHONE_TYPE_OPTIONS = createOptionsArray(PHONE_TYPE_LABELS);

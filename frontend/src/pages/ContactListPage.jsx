@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useContacts } from '../context/ContactContext';
+import { PHONE_TYPE_OPTIONS, PHONE_TYPE_LABELS } from '../constants';
 
 const ContactListPage = () => {
   const { contacts, loading, error, getContacts, createContact, updateContact, deleteContact, clearError } = useContacts();
@@ -8,7 +9,7 @@ const ContactListPage = () => {
   const [editingContact, setEditingContact] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    phone: '',
+    phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }],
     email: '',
     messenger: '',
     company: ''
@@ -18,6 +19,29 @@ const ContactListPage = () => {
     getContacts();
   }, [getContacts]);
 
+  const handleAddPhoneNumber = () => {
+    setFormData((prev) => ({
+        ...prev,
+        phone_numbers: [...prev.phone_numbers, { phone_number: '', phone_type: 'WORK_PRIMARY' }]
+    }));
+  };
+
+  const handleRemovePhoneNumber = (index) => {
+    setFormData((prev) => ({
+        ...prev,
+        phone_numbers: prev.phone_numbers.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handlePhoneNumberChange = (index, field, value) => {
+    setFormData((prev) => ({
+        ...prev,
+        phone_numbers: prev.phone_numbers.map((pn, i) => 
+            i === index ? { ...pn, [field]: value } : pn
+        )
+    }));
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -25,28 +49,52 @@ const ContactListPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    const activePhoneNumbers = formData.phone_numbers.filter(
+        pn => pn.phone_number && pn.phone_number.replace(/\D/g, '').length > 0
+    );
+
+    if (activePhoneNumbers.length === 0 && !formData.email) {
+        alert("Пожалуйста, укажите хотя бы один номер телефона или email.");
+        return;
+    }
+
+    const dataToSend = {
+        ...formData,
+        phone_numbers: activePhoneNumbers,
+    };
+    delete dataToSend.phone; 
+
     try {
-      if (editingContact) {
-        await updateContact(editingContact.id, formData);
-      } else {
-        await createContact(formData);
-      }
-      setIsModalOpen(false);
-      setEditingContact(null);
-      setFormData({ name: '', phone: '', email: '', messenger: '', company: '' });
+        if (editingContact) {
+            await updateContact(editingContact.id, dataToSend);
+        } else {
+            await createContact(dataToSend);
+        }
+        setIsModalOpen(false);
+        setEditingContact(null);
+        setFormData({ 
+            name: '', 
+            phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }], 
+            email: '', 
+            messenger: '', 
+            company: '' 
+        });
     } catch (err) {
-      // Error is handled by context
+        console.error("Ошибка при сохранении контакта:", err);
     }
   };
 
   const handleEdit = (contact) => {
     setEditingContact(contact);
     setFormData({
-      name: contact.name || '',
-      phone: contact.phone || '',
-      email: contact.email || '',
-      messenger: contact.messenger || '',
-      company: contact.company ? contact.company.name : ''
+        name: contact.name || '',
+        phone_numbers: contact.phone_numbers && contact.phone_numbers.length > 0 
+                       ? contact.phone_numbers.map(pn => ({...pn, phone_type: pn.phone_type || pn.type || 'WORK_PRIMARY'})) 
+                       : [{ phone_number: '', phone_type: 'WORK_PRIMARY' }],
+        email: contact.email || '',
+        messenger: contact.messenger || '',
+        company: contact.company ? (typeof contact.company === 'object' ? contact.company.name : contact.company) : ''
     });
     setIsModalOpen(true);
   };
@@ -97,7 +145,7 @@ const ContactListPage = () => {
               <th className="py-3 px-2 text-center w-12">№</th>
               <th className="py-3 px-0 text-center" style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }}></th>
               <th className="py-3 px-6 text-left">Имя</th>
-              <th className="py-3 px-6 text-left">Телефон</th>
+              <th className="py-3 px-6 text-left">Телефон (осн.)</th>
               <th className="py-3 px-6 text-left">Email</th>
               <th className="py-3 px-6 text-left">Компания</th>
               <th className="py-3 px-6 text-left">Messenger</th>
@@ -135,7 +183,11 @@ const ContactListPage = () => {
                   </Link>
                 </td>
 
-                <td className="py-1 px-3 text-left">{contact.phone}</td>
+                <td className="py-1 px-6 text-left align-middle">
+                  {contact.phone_numbers && contact.phone_numbers.length > 0
+                    ? `${contact.phone_numbers[0].phone_number} (${PHONE_TYPE_LABELS[contact.phone_numbers[0].phone_type] || contact.phone_numbers[0].phone_type})`
+                    : 'Не указан'}
+                </td>
                 <td className="py-1 px-3 text-left">{contact.email}</td>
 
                 <td className="py-1 px-3 text-left">
@@ -184,18 +236,45 @@ const ContactListPage = () => {
                   required
                 />
               </div>
+              {/* Блок для телефонных номеров */}
               <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Телефон
-                </label>
-                <input
-                  type="text"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  required
-                />
+                <label className="block text-gray-700 text-sm font-bold mb-2">Телефоны</label>
+                {formData.phone_numbers.map((pn, index) => (
+                  <div key={index} className="flex items-center space-x-2 mb-2">
+                    <input
+                      type="tel"
+                      placeholder="Номер телефона"
+                      value={pn.phone_number}
+                      onChange={(e) => handlePhoneNumberChange(index, 'phone_number', e.target.value)}
+                      className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    />
+                    <select
+                      value={pn.phone_type}
+                      onChange={(e) => handlePhoneNumberChange(index, 'phone_type', e.target.value)}
+                      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    >
+                      {PHONE_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    {formData.phone_numbers.length > 1 && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleRemovePhoneNumber(index)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        &#x2715;
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  onClick={handleAddPhoneNumber}
+                  className="text-blue-500 hover:text-blue-700 text-sm mt-1"
+                >
+                  + Добавить телефон
+                </button>
               </div>
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -245,7 +324,7 @@ const ContactListPage = () => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingContact(null);
-                    setFormData({ name: '', phone: '', email: '', messenger: '', company: '' });
+                    setFormData({ name: '', phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }], email: '', messenger: '', company: '' });
                   }}
                   className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                 >

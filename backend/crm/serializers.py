@@ -1,5 +1,28 @@
 from rest_framework import serializers
-from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment, MESSENGER_CHOICES, DEPARTMENT_CHOICES
+from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment, MESSENGER_CHOICES, DEPARTMENT_CHOICES, PHONE_TYPE_CHOICES, PhoneNumber, InquiryPhoneNumber
+
+
+# СЕРИАЛИЗАТОРЫ ДЛЯ ТЕЛЕФОННЫХ НОМЕРОВ
+class PhoneNumberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PhoneNumber
+        fields = ['id', 'phone_number', 'phone_type']
+
+class InquiryPhoneNumberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InquiryPhoneNumber
+        fields = ['id', 'phone_number', 'phone_type']
+
+
+# Используется для входных данных в ManualLeadCreateSerializer
+class PhoneNumberInputSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(max_length=20)
+    phone_type = serializers.ChoiceField(choices=PHONE_TYPE_CHOICES)
+
+    def validate_phone_number(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Номер телефона не может быть пустым.')
+        return value
 from .models import ROLE_CHOICES
 from django.utils import timezone
 from .services import get_workday_task_interval, get_next_workday_date
@@ -32,10 +55,40 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class ContactSerializer(serializers.ModelSerializer):
     company = CompanySerializer(read_only=True)
+    company_id = serializers.PrimaryKeyRelatedField(
+        queryset=Company.objects.all(), source='company', write_only=True, required=False, allow_null=True
+    )
+    phone_numbers = PhoneNumberSerializer(many=True, required=False)
 
     class Meta:
         model = Contact
-        fields = '__all__'
+        fields = ['id', 'name', 'email', 'messenger', 'company', 'company_id', 'phone_numbers']
+        read_only_fields = ['id', 'company']
+
+    def create(self, validated_data):
+        phone_numbers_data = validated_data.pop('phone_numbers', [])
+        contact = Contact.objects.create(**validated_data)
+        for phone_data in phone_numbers_data:
+            PhoneNumber.objects.create(contact=contact, **phone_data)
+        return contact
+
+    def update(self, instance, validated_data):
+        phone_numbers_data = validated_data.pop('phone_numbers', None)
+
+        instance.name = validated_data.get('name', instance.name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.messenger = validated_data.get('messenger', instance.messenger)
+        # company_id handles setting instance.company through source='company'
+        if 'company' in validated_data: # Ensure company is updated if company_id is passed
+             instance.company = validated_data.get('company', instance.company)
+        instance.save()
+
+        if phone_numbers_data is not None:
+            instance.phone_numbers.all().delete() # Удаляем старые номера
+            for phone_data in phone_numbers_data: # Создаем новые
+                PhoneNumber.objects.create(contact=instance, **phone_data)
+        
+        return instance
 
 
 class LeadSerializer(serializers.ModelSerializer):
@@ -67,7 +120,7 @@ class LeadSerializer(serializers.ModelSerializer):
 
 class ManualLeadCreateSerializer(serializers.Serializer):
     fullName = serializers.CharField(max_length=255, label="ФИО клиента")
-    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True, label="Телефон")
+    phone_numbers = PhoneNumberInputSerializer(many=True, required=False, allow_empty=True, label="Телефоны")
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True, label="Email")
     messenger = serializers.ChoiceField(choices=MESSENGER_CHOICES, required=False, allow_blank=True, allow_null=True, label="Мессенджер")
     companyName = serializers.CharField(max_length=255, label="Название компании")
@@ -116,6 +169,7 @@ class ManualLeadCreateSerializer(serializers.Serializer):
         """
         Общая валидация данных.
         Проверяет согласованность между 'assignments' и 'selectedProducts'.
+        Также проверяет, что указан хотя бы один способ связи (телефон или email).
         """
         assignments = data.get('assignments')
         selected_products = data.get('selectedProducts')
@@ -127,30 +181,76 @@ class ManualLeadCreateSerializer(serializers.Serializer):
                          "assignments": f"Департамент '{department_name}' из назначений отсутствует в списке выбранных продуктов/направлений."
                      })
         
-        # Пример дополнительной валидации:
-        # if not data.get('phone') and not data.get('email'):
-        #     raise serializers.ValidationError(
-        #         {"non_field_errors": "Необходимо указать телефон или email."}
-        #     )
+        # Обновленная проверка наличия хотя бы одного способа связи
+        phone_numbers_data = data.get('phone_numbers')
+        email_data = data.get('email')
+
+        has_phone = False
+        if phone_numbers_data: # Если список телефонов предоставлен
+            for phone_entry in phone_numbers_data:
+                # PhoneNumberInputSerializer уже проверил, что phone_number не пустой,
+                # если phone_entry (словарь с phone_number и phone_type) был предоставлен.
+                # Здесь мы просто проверяем, что есть хотя бы одна валидная запись телефона.
+                if phone_entry.get('phone_number'): 
+                    has_phone = True
+                    break
+        
+        if not has_phone and not email_data:
+            raise serializers.ValidationError(
+                {"non_field_errors": "Необходимо указать хотя бы один телефон или email."}
+            )
 
         return data
 
 
 class InquirySerializer(serializers.ModelSerializer):
     responsible = CustomUserSerializer(read_only=True)
-
-    def create(self, validated_data):
-        inquiry = super().create(validated_data)
-        contact = getattr(inquiry, 'contact', None)
-        if contact and contact.company:
-            company = contact.company
-            company.main_contact = contact
-            company.save()
-        return inquiry
+    phone_numbers = InquiryPhoneNumberSerializer(many=True, required=False)
 
     class Meta:
         model = Inquiry
-        fields = '__all__'
+        fields = [
+            'id', 'full_name', 'email', 'messenger', 'company_name', 
+            'company_site', 'need_description', 'departments', 'created_at', 
+            'status', 'responsible', 'phone_numbers'
+        ]
+        read_only_fields = ['id', 'created_at', 'responsible']
+
+    def create(self, validated_data):
+        phone_numbers_data = validated_data.pop('phone_numbers', [])
+        
+        # Original responsible user logic from existing create method
+        responsible_user = self.context['request'].user
+        if responsible_user.is_authenticated and hasattr(responsible_user, 'role') and responsible_user.role in ['admin', 'manager', 'operator']:
+            validated_data['responsible'] = responsible_user
+        
+        inquiry = Inquiry.objects.create(**validated_data)
+        
+        for phone_data in phone_numbers_data:
+            InquiryPhoneNumber.objects.create(inquiry=inquiry, **phone_data)
+        return inquiry
+
+    def update(self, instance, validated_data):
+        phone_numbers_data = validated_data.pop('phone_numbers', None)
+
+        # Update Inquiry instance fields (list them explicitly)
+        instance.full_name = validated_data.get('full_name', instance.full_name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.messenger = validated_data.get('messenger', instance.messenger)
+        instance.company_name = validated_data.get('company_name', instance.company_name)
+        instance.company_site = validated_data.get('company_site', instance.company_site)
+        instance.need_description = validated_data.get('need_description', instance.need_description)
+        instance.departments = validated_data.get('departments', instance.departments)
+        instance.status = validated_data.get('status', instance.status)
+        # responsible is read_only, created_at is read_only
+        instance.save()
+
+        if phone_numbers_data is not None:
+            instance.phone_numbers.all().delete() # Удаляем старые номера
+            for phone_data in phone_numbers_data: # Создаем новые
+                InquiryPhoneNumber.objects.create(inquiry=instance, **phone_data)
+        
+        return instance
 
 
 class DealEventSerializer(serializers.ModelSerializer):

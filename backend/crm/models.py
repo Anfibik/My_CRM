@@ -88,9 +88,39 @@ class CustomUser(AbstractUser):
         return self.full_name
 
 
+PHONE_TYPE_CHOICES = [
+    ('WORK_PRIMARY', 'Рабочий'),
+    ('WORK_SECONDARY', 'Дополнительный'),
+    ('MOBILE', 'Личный'),
+]
+
+class PhoneNumber(models.Model):
+    contact = models.ForeignKey(
+        'Contact', 
+        related_name='phone_numbers', 
+        on_delete=models.CASCADE, 
+        verbose_name="Контакт"
+    )
+    phone_number = models.CharField(max_length=20, verbose_name="Номер телефона")
+    phone_type = models.CharField(
+        max_length=20,
+        choices=PHONE_TYPE_CHOICES,
+        verbose_name="Тип телефона"
+    )
+
+    def __str__(self):
+        return f"{self.get_phone_type_display()}: {self.phone_number}"
+
+    class Meta:
+        verbose_name = "Номер телефона"
+        verbose_name_plural = "Номера телефонов"
+        unique_together = [
+            ('contact', 'phone_number'),
+            ('contact', 'phone_type')
+        ]
+
 class Contact(models.Model):
     name = models.CharField(max_length=255, verbose_name="ФИО Контакта")
-    phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True, null=True)
     email = models.EmailField(verbose_name="Email", blank=True, null=True)
     messenger = models.CharField(
         max_length=100,
@@ -127,7 +157,22 @@ class Company(models.Model):
     def save(self, *args, **kwargs):
         if self.name and not (self.name.startswith('"') and self.name.endswith('"')):
             self.name = f'"{self.name}"'
-        super().save(*args, **kwargs)
+        
+        target_phone = None
+        if self.main_contact:
+            # Пытаемся найти телефон с типом 'WORK_PRIMARY'
+            primary_phone = self.main_contact.phone_numbers.filter(phone_type='WORK_PRIMARY').first()
+            if primary_phone:
+                target_phone = primary_phone.phone_number
+            else:
+                # Если основного рабочего нет, берем первый доступный номер этого контакта
+                first_available_phone = self.main_contact.phone_numbers.all().first()
+                if first_available_phone:
+                    target_phone = first_available_phone.phone_number
+        
+        self.phone = target_phone # target_phone будет None, если контакт не назначен или у него нет номеров
+        
+        super().save(*args, **kwargs) # Вызываем оригинальный метод сохранения
 
     def __str__(self):
         return self.name
@@ -265,7 +310,6 @@ class Deal(models.Model):
 
 class Inquiry(models.Model):
     full_name = models.CharField(max_length=255, verbose_name="ФИО контакта")
-    phone = models.CharField(max_length=20, verbose_name="Телефон")
     email = models.EmailField(verbose_name="Email", blank=True, null=True)
     messenger = models.CharField(
         max_length=100,
@@ -306,6 +350,32 @@ class Inquiry(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class InquiryPhoneNumber(models.Model):
+    inquiry = models.ForeignKey(
+        'Inquiry', 
+        related_name='phone_numbers',
+        on_delete=models.CASCADE, 
+        verbose_name="Обращение"
+    )
+    phone_number = models.CharField(max_length=20, verbose_name="Номер телефона")
+    phone_type = models.CharField(
+        max_length=20,
+        choices=PHONE_TYPE_CHOICES, # PHONE_TYPE_CHOICES должны быть определены ранее в файле
+        verbose_name="Тип телефона"
+    )
+
+    def __str__(self):
+        return f"{self.inquiry.full_name} - {self.get_phone_type_display()}: {self.phone_number}"
+
+    class Meta:
+        verbose_name = "Номер телефона (Обращение)"
+        verbose_name_plural = "Номера телефонов (Обращения)"
+        unique_together = [
+            ('inquiry', 'phone_number'),
+            ('inquiry', 'phone_type') 
+        ]
 
 
 class DealEvent(models.Model):

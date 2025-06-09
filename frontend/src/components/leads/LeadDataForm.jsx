@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MESSENGER_LABELS } from '../../constants';
+import { MESSENGER_LABELS, PHONE_TYPE_OPTIONS, PHONE_TYPE_LABELS } from '../../constants';
 
 // TODO: Consider moving AVAILABLE_PRODUCTS to a shared constants.js file
 const AVAILABLE_PRODUCTS = [
@@ -15,7 +15,11 @@ const AVAILABLE_PRODUCTS = [
 
 const LeadDataForm = ({ onSubmit, onCancel, initialData = {} }) => {
     const [fullName, setFullName] = useState(initialData.fullName || "");
-    const [phone, setPhone] = useState(initialData.phone || "+380");
+    const [phoneNumbers, setPhoneNumbers] = useState(
+        initialData.phone_numbers && initialData.phone_numbers.length > 0
+            ? initialData.phone_numbers
+            : [{ phone_number: "+380", phone_type: "WORK_PRIMARY" }]
+    );
     const [email, setEmail] = useState(initialData.email || "");
     const [messenger, setMessenger] = useState(initialData.messenger || "");
     const [companyName, setCompanyName] = useState(initialData.companyName || "");
@@ -26,7 +30,12 @@ const LeadDataForm = ({ onSubmit, onCancel, initialData = {} }) => {
     useEffect(() => {
         // If initialData changes, update the form fields
         setFullName(initialData.fullName || "");
-        setPhone(initialData.phone || "+380");
+        // setPhone(initialData.phone || "+380"); // Заменено на phoneNumbers
+        setPhoneNumbers(
+            initialData.phone_numbers && initialData.phone_numbers.length > 0
+                ? initialData.phone_numbers
+                : [{ phone_number: "+380", phone_type: "WORK_PRIMARY" }]
+        );
         setEmail(initialData.email || "");
         setMessenger(initialData.messenger || "");
         setCompanyName(initialData.companyName || "");
@@ -43,18 +52,46 @@ const LeadDataForm = ({ onSubmit, onCancel, initialData = {} }) => {
         );
     };
 
+    const handleAddPhoneNumber = () => {
+        setPhoneNumbers([...phoneNumbers, { phone_number: "+380", phone_type: "WORK_PRIMARY" }]);
+    };
+
+    const handleRemovePhoneNumber = (index) => {
+        const newPhoneNumbers = phoneNumbers.filter((_, i) => i !== index);
+        setPhoneNumbers(newPhoneNumbers);
+    };
+
+    const handlePhoneNumberChange = (index, field, value) => {
+        const newPhoneNumbers = phoneNumbers.map((pn, i) => {
+            if (i === index) {
+                return { ...pn, [field]: value };
+            }
+            return pn;
+        });
+        setPhoneNumbers(newPhoneNumbers);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
+        // Фильтруем пустые номера перед отправкой, если нужно (например, если пользователь добавил поле, но не заполнил)
+        const activePhoneNumbers = phoneNumbers.filter(pn => pn.phone_number && pn.phone_number.replace(/\D/g, '').length > 0);
+
+        if (activePhoneNumbers.length === 0 && !email) {
+            alert("Пожалуйста, укажите хотя бы один номер телефона или email.");
+            return;
+        }
+
         const formData = {
             fullName,
-            phone,
+            phone_numbers: activePhoneNumbers,
             email,
             messenger,
             companyName,
             companySite,
             needDescription,
-            selectedProducts, // These are the selected 'departments' or 'products'
+            selectedProducts, 
         };
+        console.log('LeadDataForm handleSubmit, formData to submit:', formData);
         onSubmit(formData);
     };
 
@@ -72,14 +109,44 @@ const LeadDataForm = ({ onSubmit, onCancel, initialData = {} }) => {
                 />
             </div>
             <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Телефон:</label>
-                <input
-                    type="tel"
-                    id="phone"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Телефоны:</label>
+                {phoneNumbers.map((pn, index) => (
+                    <div key={index} className="flex items-center space-x-2 mb-2">
+                        <input
+                            type="tel"
+                            placeholder="Номер телефона"
+                            className="flex-grow mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            value={pn.phone_number}
+                            onChange={(e) => handlePhoneNumberChange(index, 'phone_number', e.target.value)}
+                        />
+                        <select
+                            className="mt-1 block w-auto px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            value={pn.phone_type}
+                            onChange={(e) => handlePhoneNumberChange(index, 'phone_type', e.target.value)}
+                        >
+                            {PHONE_TYPE_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                        {phoneNumbers.length > 1 && (
+                            <button
+                                type="button"
+                                onClick={() => handleRemovePhoneNumber(index)}
+                                className="p-2 text-red-500 hover:text-red-700"
+                                title="Удалить телефон"
+                            >
+                                &#x2715; 
+                            </button>
+                        )}
+                    </div>
+                ))}
+                <button
+                    type="button"
+                    onClick={handleAddPhoneNumber}
+                    className="mt-2 px-3 py-1 text-sm text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50"
+                >
+                    Добавить телефон
+                </button>
             </div>
             <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email:</label>

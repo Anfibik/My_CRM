@@ -134,10 +134,14 @@ const CompanyListPage = () => {
                 </td>
 
                 <td className="py-1 px-3 text-left">
-                  <Link to={`/contacts/${company.main_contact.id}`} className="text-gray hover:underline">
-                    {company.main_contact.name}
-                  </Link>                 
-                  </td>
+                  {company.main_contact && company.main_contact.id ? (
+                    <Link to={`/contacts/${company.main_contact.id}`} className="text-blue-600 hover:text-blue-800">
+                      {company.main_contact.name || 'Имя не указано'}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
 
                 <td className="py-1 px-3 text-left">
                   {company.site ? (

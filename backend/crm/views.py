@@ -468,33 +468,60 @@ class TaskChangeLogViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
+import logging # Добавляем импорт logging в начале файла или перед функцией, если его еще нет
+
+logger = logging.getLogger(__name__) # Инициализируем логгер для этого модуля
+
 @api_view(['POST'])
 def convert_inquiry_view(request, pk):
     """
     Принимает POST /api/inquiries/<pk>/convert/
     Конвертирует указанное обращение в Contact, Company, Lead, Deal
     """
+    logger.info(f"Attempting to convert inquiry with pk={pk}. Request data: {request.data}")
     try:
         inquiry = Inquiry.objects.get(pk=pk)
+        logger.info(f"Inquiry pk={pk} found: {inquiry.full_name}")
+
+        # Проверка, есть ли у обращения телефонные номера (для отладки)
+        if not inquiry.phone_numbers.exists():
+            logger.warning(f"Inquiry pk={pk} ({inquiry.full_name}) has NO phone numbers associated before conversion attempt.")
+        else:
+            phone_numbers_details = [
+                f'{pn.phone_number} ({pn.get_phone_type_display()})' 
+                for pn in inquiry.phone_numbers.all()
+            ]
+            logger.info(f"Inquiry pk={pk} ({inquiry.full_name}) has phone numbers: {phone_numbers_details}")
 
         # Если лид для этого обращения уже создан
         try:
             inquiry.lead
+            logger.warning(f"Inquiry pk={pk} ({inquiry.full_name}) already converted. Lead ID: {inquiry.lead.id if hasattr(inquiry, 'lead') and inquiry.lead else 'N/A'}")
             return Response({"detail": "Данное обращение уже конвертировано"}, status=status.HTTP_400_BAD_REQUEST)
         except Lead.DoesNotExist:
+            logger.info(f"Inquiry pk={pk} ({inquiry.full_name}) not yet converted. Proceeding with conversion.")
             pass
 
         # Используем конвертацию через сервис
         department_assignments = request.data.get("department_assignments", {})
+        logger.info(f"Department assignments for inquiry pk={pk} ({inquiry.full_name}): {department_assignments}")
+        
+        logger.info(f"Calling convert_inquiry service for inquiry pk={pk} ({inquiry.full_name})...")
         lead = convert_inquiry(inquiry, department_assignments)
+        logger.info(f"convert_inquiry service finished for inquiry pk={pk} ({inquiry.full_name}). Lead object: {lead}")
         contact = lead.contact
         deals = list(lead.deals.values_list('id', flat=True))
+        logger.info(f"Inquiry pk={pk} ({inquiry.full_name}) successfully converted. Lead ID: {lead.id}, Contact ID: {contact.id if contact else 'N/A'}, Company ID: {contact.company.id if contact and contact.company else 'N/A'}, Deal IDs: {deals}")
         return Response({
             "detail": "Обращение успешно конвертировано",
-            "contact_id": contact.id,
-            "company_id": contact.company.id if contact.company else None,
+            "contact_id": contact.id if contact else None,
+            "company_id": contact.company.id if contact and contact.company else None,
             "lead_id": lead.id,
             "deal_ids": deals
         }, status=status.HTTP_200_OK)
+    except Inquiry.DoesNotExist:
+        logger.error(f"Inquiry with pk={pk} not found during conversion attempt.")
+        return Response({"detail": "Обращение не найдено."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        logger.error(f"Error during inquiry conversion (pk={pk}, name: {inquiry.full_name if 'inquiry' in locals() else 'N/A'}): {str(e)}", exc_info=True)
         return Response({"detail": f"Ошибка при конвертации: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api/config';
 import EmployeeAssignmentModal from '../components/common/EmployeeAssignmentModal';
 import LeadDataForm from '../components/leads/LeadDataForm';
+import { PHONE_TYPE_LABELS } from '../constants';
 
 const InquiryListPage = () => {
     const [inquiries, setInquiries] = useState([]);
@@ -110,9 +111,10 @@ const InquiryListPage = () => {
 
     // Функция отправки формы создания нового обращения (данные приходят из LeadDataForm)
     const handleCreateInquiry = async (formData) => {
+        console.log('InquiryListPage handleCreateInquiry, formData received:', formData);
         const inquiryData = {
             full_name: formData.fullName,
-            phone: formData.phone,
+            phone_numbers: formData.phone_numbers, // Используем массив номеров
             email: formData.email,
             messenger: formData.messenger,
             company_name: formData.companyName,
@@ -122,6 +124,7 @@ const InquiryListPage = () => {
             status: "pending",
         };
 
+        console.log('InquiryListPage handleCreateInquiry, inquiryData to send:', inquiryData);
         try {
             await api.post('/api/inquiries/', inquiryData);
             setShowModal(false); // Закрываем модальное окно
@@ -176,7 +179,15 @@ const InquiryListPage = () => {
                     return (
                         <li key={inquiry.id} className={cardClass + " flex justify-between items-center space-x-4"}>
                             <div className="flex-1 min-w-0">
-                                <p><strong>{inquiry.full_name}</strong> ({inquiry.phone})</p>
+                                <p><strong>{inquiry.full_name}</strong> 
+                                   ({(() => {
+                                           const workPrimaryPhone = inquiry.phone_numbers?.find(p => p.phone_type === 'WORK_PRIMARY');
+                                           if (workPrimaryPhone) {
+                                               return `${workPrimaryPhone.phone_number} (${PHONE_TYPE_LABELS[workPrimaryPhone.phone_type] || workPrimaryPhone.phone_type})`;
+                                           }
+                                           return 'Телефон не указан';
+                                       })()})
+                                </p>
                                 <p>Компания: {inquiry.company_name || "Не указана"}</p>
                                 <p className="truncate">{inquiry.need_description}</p>
                                 <p>Статус: {statusMap[inquiry.status] ?? inquiry.status}</p>
@@ -227,7 +238,7 @@ const InquiryListPage = () => {
                             onCancel={() => setShowModal(false)}
                             initialData={{ 
                                 fullName: "", 
-                                phone: "+380", 
+                                phone_numbers: [{ phone_number: "+380", phone_type: "WORK_PRIMARY" }], 
                                 email: "", 
                                 messenger: "", 
                                 companyName: "", 

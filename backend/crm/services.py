@@ -1,7 +1,9 @@
-from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser, Task, DEPARTMENT_CHOICES
+from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, DEPARTMENT_CHOICES, \
+    PhoneNumber, Task
 import datetime
 from django.utils import timezone
 from django.db import transaction
+from .models import PhoneNumber
 
 # Создаем глобальный словарь для обратного преобразования
 # { "ШМБ": "warehouses", "Стеллажные системы": "shelving_systems", ... }
@@ -26,29 +28,57 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
                 site=inquiry.company_site or ""
             )
 
-    # 2. Обработка Contact: ищем по телефону или email, если не нашли – создаем.
+    # 2. Обработка Contact: ищем по телефонным номерам из Inquiry или по email, если не нашли – создаем.
     contact = None
-    if inquiry.phone:
-        contact = Contact.objects.filter(phone=inquiry.phone).first()
+    
+    # Сначала пытаемся найти контакт по телефонным номерам из Inquiry
+    # Предполагается, что модель PhoneNumber импортирована (from .models import PhoneNumber)
+    if inquiry.phone_numbers.exists():
+        for inquiry_phone_obj in inquiry.phone_numbers.all():
+            # Ищем контакт, у которого есть такой же номер телефона
+            # (предполагаем, что Contact связан с моделью PhoneNumber через related_name 'phone_numbers')
+            existing_contact = Contact.objects.filter(phone_numbers__phone_number=inquiry_phone_obj.phone_number).first()
+            if existing_contact:
+                contact = existing_contact
+                break 
+                
+    # Если не нашли по телефону, ищем по email
     if not contact and inquiry.email:
-        contact = Contact.objects.filter(email=inquiry.email).first()
+        contact = Contact.objects.filter(email__iexact=inquiry.email).first()
 
     if contact:
-        # Обновляем данные контакта
+        # Контакт найден, обновляем его данные
         contact.name = inquiry.full_name
-        contact.messenger = inquiry.messenger
-        if company:
+        contact.messenger = inquiry.messenger or contact.messenger # Обновляем, если есть новое значение, иначе оставляем старое
+        if company and not contact.company: # Присваиваем компанию, если у контакта ее нет
             contact.company = company
         contact.save()
+
+        # Обновляем/добавляем телефонные номера для существующего контакта
+        # Получаем множество существующих у контакта номеров для быстрой проверки
+        existing_contact_phone_numbers_set = set(pn.phone_number for pn in contact.phone_numbers.all())
+        for inquiry_phone_obj in inquiry.phone_numbers.all():
+            if inquiry_phone_obj.phone_number not in existing_contact_phone_numbers_set:
+                PhoneNumber.objects.create(
+                    contact=contact,
+                    phone_number=inquiry_phone_obj.phone_number,
+                    phone_type=inquiry_phone_obj.phone_type # Переносим тип телефона
+                )
     else:
-        # Создаем новый контакт
+        # Контакт не найден, создаем новый
         contact = Contact.objects.create(
             name=inquiry.full_name,
-            phone=inquiry.phone or "",
             email=inquiry.email or "",
-            messenger=inquiry.messenger,
+            messenger=inquiry.messenger or "",
             company=company
         )
+        # Добавляем все телефонные номера из Inquiry к новому контакту
+        for inquiry_phone_obj in inquiry.phone_numbers.all():
+            PhoneNumber.objects.create(
+                contact=contact,
+                phone_number=inquiry_phone_obj.phone_number,
+                phone_type=inquiry_phone_obj.phone_type # Переносим тип телефона
+            )
 
     # После создания/обновления контакта, назначаем его главным в компании
     if company:
@@ -138,7 +168,7 @@ def create_lead_manually(validated_data, creating_user: CustomUser):
     полученных из ManualLeadCreateSerializer.
     """
     full_name = validated_data['fullName']
-    phone = validated_data.get('phone')
+    phone_numbers_data = validated_data.get('phone_numbers', [])
     email = validated_data.get('email')
     messenger = validated_data.get('messenger')
     company_name = validated_data['companyName']
@@ -158,29 +188,46 @@ def create_lead_manually(validated_data, creating_user: CustomUser):
             company.save(update_fields=['site'])
 
     # 2. Обработка Contact
-    contact_qs = Contact.objects.none()
-    if phone:
-        contact_qs = Contact.objects.filter(phone=phone)
-    if not contact_qs.exists() and email:
-        contact_qs = Contact.objects.filter(email__iexact=email)
-    
-    contact = contact_qs.first()
+    contact = None
+    # Сначала пытаемся найти контакт по email, если он предоставлен
+    if email:
+        contact = Contact.objects.filter(email__iexact=email).first()
 
-    if contact:
-        contact.name = full_name
+    # Если контакт не найден по email, и есть телефонные номера,
+    # пытаемся найти по одному из них (например, первый непустой)
+    if not contact and phone_numbers_data:
+        for phone_data in phone_numbers_data:
+            if phone_data.get('phone_number'):
+                contact_found_by_phone = Contact.objects.filter(
+                    phone_numbers__phone_number=phone_data['phone_number']
+                ).first()
+                if contact_found_by_phone:
+                    contact = contact_found_by_phone
+                    break 
+    
+    if contact: # Если контакт найден (по email или телефону)
+        contact.name = full_name # Обновляем имя, если нужно
         if messenger and contact.messenger != messenger:
             contact.messenger = messenger
         if company and contact.company != company:
             contact.company = company
         contact.save()
-    else:
+
+        # Обновляем телефонные номера: удаляем старые, создаем новые
+        contact.phone_numbers.all().delete()
+        for phone_data in phone_numbers_data:
+            PhoneNumber.objects.create(contact=contact, **phone_data)
+            
+    else: # Если контакт не найден, создаем новый
         contact = Contact.objects.create(
             name=full_name,
-            phone=phone or "",
             email=email or "",
             messenger=messenger or "",
             company=company
         )
+        # Добавляем телефонные номера к новому контакту
+        for phone_data in phone_numbers_data:
+            PhoneNumber.objects.create(contact=contact, **phone_data)
 
     if company and not company.main_contact:
         company.main_contact = contact

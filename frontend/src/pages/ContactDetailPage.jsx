@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/config';
+import { PHONE_TYPE_LABELS } from '../constants';
 
 // Вспомогательные словари (используем те же, что и в LeadDetailPage, если применимо)
 const messengerMap = {
@@ -130,7 +131,18 @@ const ContactDetailPage = () => {
         <DetailItem label="Фамилия" value={contact.last_name} />
         <DetailItem label="Отчество" value={contact.middle_name} />
         <DetailItem label="Должность" value={contact.position} />
-        <DetailItem label="Телефон" value={contact.phone} />
+        {/* Отображение нескольких телефонных номеров */}
+        {contact.phone_numbers && contact.phone_numbers.length > 0 ? (
+          contact.phone_numbers.map((pn, index) => (
+            <DetailItem 
+              key={`phone-${index}`} 
+              label={`Телефон (${PHONE_TYPE_LABELS[pn.phone_type] || pn.phone_type})`} 
+              value={pn.phone_number} 
+            />
+          ))
+        ) : (
+          <DetailItem label="Телефон" value={null} /> 
+        )}
         <DetailItem label="Email" value={contact.email} />
         <DetailItem label="Мессенджер" value={messengerMap[contact.messenger] || contact.messenger} />
         <DetailItem label="Источник" value={sourceMap[contact.source] || contact.source} />

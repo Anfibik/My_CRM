@@ -27,8 +27,8 @@ class CompanyAdmin(admin.ModelAdmin):
 
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone", "email", "company")
-    search_fields = ("name", "phone", "email")
+    list_display = ("name", "email", "company")
+    search_fields = ("name", "email")
     list_filter = ("company",)
 
 
@@ -60,8 +60,8 @@ class DealAdmin(admin.ModelAdmin):
 
 @admin.register(Inquiry)
 class InquiryAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'phone', 'email', 'messenger', 'company_name', 'created_at', 'status')
-    search_fields = ('full_name', 'phone', 'email', 'company_name')
+    list_display = ('full_name', 'email', 'messenger', 'company_name', 'created_at', 'status')
+    search_fields = ('full_name', 'email', 'company_name')
     list_filter = ('status', 'messenger', 'created_at')
 
 
