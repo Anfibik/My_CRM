@@ -39,6 +39,11 @@ DEPARTMENT_CHOICES = [
     ("marketing", "Маркетинг"),
 ]
 
+LEAD_SOURCE_CHOICES = [
+    ('inquiry', 'Из обращения'),
+    ('manual', 'Ручное создание'),
+]
+
 # phone_validator = RegexValidator(
 #     regex=r'^\+?1?\d{9,15}$',
 #     message="Номер телефона должен быть в формате: '+999999999'. До 15 цифр."
@@ -161,6 +166,12 @@ class Lead(models.Model):
         default="new",
         verbose_name="Статус"
     )
+    source = models.CharField(
+        max_length=20,
+        choices=LEAD_SOURCE_CHOICES,
+        default='inquiry',
+        verbose_name="Источник лида"
+    )
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
@@ -243,7 +254,9 @@ class Deal(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        self.name = f"{self.lead.contact.company.name} ({self.department})"
+        if not self.name and self.lead and self.lead.contact and self.lead.contact.company:
+            department_display_name = self.get_department_display() 
+            self.name = f"{self.lead.contact.company.name} ({department_display_name})"
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -1,38 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/config';
 import EmployeeAssignmentModal from '../components/common/EmployeeAssignmentModal';
+import LeadDataForm from '../components/leads/LeadDataForm';
 
 const InquiryListPage = () => {
     const [inquiries, setInquiries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
 
-    // Состояния для формы создания обращения
-    const [fullName, setFullName] = useState("");
-    const [phone, setPhone] = useState("+380");
-    const [email, setEmail] = useState("");
-    const [messenger, setMessenger] = useState("");
-    const [companyName, setCompanyName] = useState("");
-    const [companySite, setCompanySite] = useState("https://");
-    const [needDescription, setNeedDescription] = useState("");
-    const [selectedProducts, setSelectedProducts] = useState([]);
+    // Состояния для формы создания обращения теперь управляются LeadDataForm
     const [showEmployeeModal, setShowEmployeeModal] = useState(false); // флаг для показа модального окна выбора сотрудников
     const [currentInquiryId, setCurrentInquiryId] = useState(null);    // ID обращения, которое собираемся конвертировать
     const [selectedDepartments, setSelectedDepartments] = useState([]);  // Массив отделов, выбранных в обращении (из inquiry.products)
 
 
-
-    // Статичный список продуктов, который оператор выбирает галочками
-    const availableProducts = [
-        "Стеллажные системы",
-        "Складсая техника",
-        "ШМБ",
-        "Пластиковая тара",
-        "Автоматизация",
-        "Мусорные баки",
-        "Системы сортировки",
-        "Сервисные услуги",
-    ];
      
 
     // Словарь для отображения человекочитаемого статуса
@@ -127,48 +108,28 @@ const InquiryListPage = () => {
         }
     };
 
-    
-    // Обработчик изменения чекбоксов для продуктов
-    const handleCheckboxChange = (product) => {
-        if (selectedProducts.includes(product)) {
-            setSelectedProducts(selectedProducts.filter(p => p !== product));
-        } else {
-            setSelectedProducts([...selectedProducts, product]);
-        }
-    };
-
-    // Функция отправки формы создания нового обращения
-    const handleCreateInquiry = async (e) => {
-        e.preventDefault();
-        const newInquiry = {
-            full_name: fullName,
-            phone,
-            email,
-            messenger,
-            company_name: companyName,
-            company_site: companySite,
-            need_description: needDescription,
-            departments: selectedProducts,
+    // Функция отправки формы создания нового обращения (данные приходят из LeadDataForm)
+    const handleCreateInquiry = async (formData) => {
+        const inquiryData = {
+            full_name: formData.fullName,
+            phone: formData.phone,
+            email: formData.email,
+            messenger: formData.messenger,
+            company_name: formData.companyName,
+            company_site: formData.companySite,
+            need_description: formData.needDescription,
+            departments: formData.selectedProducts, // Ключ изменен на 'departments' для соответствия модели Inquiry
+            status: "pending",
         };
-        console.log("Данные обращения:", newInquiry);
-        try {
-            await api.post("/api/inquiries/", newInquiry);
-            alert("Обращение успешно создано!");
-            fetchInquiries(); // обновляем список обращений
-            setShowModal(false); // закрываем модальное окно
 
-            // Очистка формы
-            setFullName("");
-            setPhone("");
-            setEmail("");
-            setMessenger("");
-            setCompanyName("");
-            setCompanySite("");
-            setNeedDescription("");
-            setSelectedProducts([]);
+        try {
+            await api.post('/api/inquiries/', inquiryData);
+            setShowModal(false); // Закрываем модальное окно
+            fetchInquiries(); // Обновляем список обращений
+            // TODO: Добавить уведомление об успешном создании (например, через toast)
         } catch (error) {
             console.error("Ошибка при создании обращения:", error);
-            alert("Не удалось создать обращение.");
+            // TODO: Добавить уведомление об ошибке (например, через toast)
         }
     };
 
@@ -261,101 +222,20 @@ const InquiryListPage = () => {
                 <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 p-4">
                     <div className="bg-white p-6 rounded shadow-lg w-full max-w-md max-h-[80vh] overflow-y-auto">
                         <h3 className="text-xl font-bold mb-4">Создать обращение</h3>
-                        <form onSubmit={handleCreateInquiry}>
-
-                            <div className="mb-2">
-                                <label className="block font-semibold">ФИО клиента:</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-2 border rounded"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Телефон:</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-2 border rounded"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                />
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Email:</label>
-                                <input
-                                    type="email"
-                                    className="w-full p-2 border rounded"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Мессенджер:</label>
-                                <select
-                                    className="w-full p-2 border rounded"
-                                    value={messenger}
-                                    onChange={(e) => setMessenger(e.target.value)}
-                                >
-                                    <option value="">Выберите мессенджер</option>
-                                    <option value="telegram">Telegram</option>
-                                    <option value="viber">Viber</option>
-                                    <option value="whatsapp">WhatsApp</option>
-                                    <option value="signal">Signal</option>
-                                </select>
-                            </div>
-
-                            <div className="mb-2">
-                                <label className="block font-semibold">Название компании:</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-2 border rounded"
-                                    value={companyName}
-                                    onChange={(e) => setCompanyName(e.target.value)}
-                                />
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Сайт компании:</label>
-                                <input
-                                    type="url"
-                                    className="w-full p-2 border rounded"
-                                    value={companySite}
-                                    onChange={(e) => setCompanySite(e.target.value)}
-                                />
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Описание потребности:</label>
-                                <textarea
-                                    className="w-full p-2 border rounded"
-                                    rows="3"
-                                    value={needDescription}
-                                    onChange={(e) => setNeedDescription(e.target.value)}
-                                ></textarea>
-                            </div>
-                            <div className="mb-2">
-                                <label className="block font-semibold">Выбранные направления:</label>
-                                {availableProducts.map((product) => (
-                                    <div key={product} className="flex items-center mb-1">
-                                        <input
-                                            type="checkbox"
-                                            className="mr-2"
-                                            checked={selectedProducts.includes(product)}
-                                            onChange={() => handleCheckboxChange(product)}
-                                        />
-                                        <span>{product}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex justify-end space-x-2">
-                                <button type="button" onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-2 rounded">
-                                    Отмена
-                                </button>
-                                <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
-                                    Создать
-                                </button>
-                            </div>
-                        </form>
+                        <LeadDataForm 
+                            onSubmit={handleCreateInquiry}
+                            onCancel={() => setShowModal(false)}
+                            initialData={{ 
+                                fullName: "", 
+                                phone: "+380", 
+                                email: "", 
+                                messenger: "", 
+                                companyName: "", 
+                                companySite: "https://", 
+                                needDescription: "", 
+                                selectedProducts: [] 
+                            }}
+                        />
                     </div>
                 </div>
             )}

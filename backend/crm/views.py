@@ -9,14 +9,15 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
+import traceback
 
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
 from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
 from .permissions import IsDealAccess, NotCallOperator
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
-    DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer
+    DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer, ManualLeadCreateSerializer
 from .serializers import TaskSerializer, TaskDiscussionSerializer, TaskChangeLogSerializer, TaskAttachmentSerializer
-from .services import convert_inquiry
+from .services import convert_inquiry, create_lead_manually
 
 
 class CompanyListCreateView(generics.ListCreateAPIView):
@@ -66,6 +67,27 @@ class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
     permission_classes = [IsAuthenticated, NotCallOperator]
+
+
+class ManualLeadCreateAPIView(APIView):
+    """
+    APIView для ручного создания лида.
+    Принимает POST запросы с данными для создания лида, контакта, компании и связанных сделок.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ManualLeadCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                lead = create_lead_manually(serializer.validated_data, request.user)
+                response_serializer = LeadSerializer(lead, context={'request': request})
+                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print(f"!!!!!!!!!!!! An error occurred in ManualLeadCreateAPIView: {e}") # For debugging
+                traceback.print_exc() # For detailed traceback
+                return Response({"error": "Internal server error during lead creation", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class InquiryViewSet(viewsets.ModelViewSet):

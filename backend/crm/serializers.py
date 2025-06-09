@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment
+from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment, MESSENGER_CHOICES, DEPARTMENT_CHOICES
 from .models import ROLE_CHOICES
 from django.utils import timezone
 from .services import get_workday_task_interval, get_next_workday_date
@@ -61,6 +61,79 @@ class LeadSerializer(serializers.ModelSerializer):
         if obj.department_assignments:
             return list(obj.department_assignments.keys())
         return []
+
+
+
+
+class ManualLeadCreateSerializer(serializers.Serializer):
+    fullName = serializers.CharField(max_length=255, label="ФИО клиента")
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True, label="Телефон")
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True, label="Email")
+    messenger = serializers.ChoiceField(choices=MESSENGER_CHOICES, required=False, allow_blank=True, allow_null=True, label="Мессенджер")
+    companyName = serializers.CharField(max_length=255, label="Название компании")
+    companySite = serializers.URLField(required=False, allow_blank=True, allow_null=True, label="Сайт компании")
+    needDescription = serializers.CharField(label="Описание потребности", style={'base_template': 'textarea.html'})
+    selectedProducts = serializers.ListField(
+        child=serializers.CharField(), 
+        label="Выбранные продукты/направления"
+    )
+    assignments = serializers.DictField(
+        child=serializers.IntegerField(min_value=1), # ID пользователя должен быть > 0
+        label="Назначенные ответственные",
+        help_text="Словарь {название_департамента: ID_сотрудника}"
+    )
+
+    def validate_selectedProducts(self, value):
+        """
+        Проверяет, что все выбранные продукты/направления являются допустимыми.
+        """
+        # DEPARTMENT_CHOICES is a list of tuples (value, label)
+        # We need to check against the labels (display names) coming from frontend
+        valid_department_display_names = [label for _, label in DEPARTMENT_CHOICES]
+        for product_name in value:
+            if product_name not in valid_department_display_names:
+                raise serializers.ValidationError(f"Недопустимое направление/продукт: '{product_name}'.")
+        return value
+
+    def validate_assignments(self, data):
+        """
+        Проверяет, что:
+        1. Все департаменты в assignments существуют (по названию).
+        2. Все ID сотрудников в assignments соответствуют существующим пользователям.
+        """
+        # assignments_data is the dictionary passed for the 'assignments' field
+        valid_department_display_names = [label for _, label in DEPARTMENT_CHOICES]
+
+        for department_name, employee_id in data.items(): # 'data' here is the assignments dictionary itself
+            if department_name not in valid_department_display_names:
+                raise serializers.ValidationError(f"Недопустимое название департамента в назначениях: '{department_name}'.")
+            
+            if not CustomUser.objects.filter(id=employee_id).exists():
+                raise serializers.ValidationError(f"Сотрудник с ID {employee_id} (назначенный на '{department_name}') не найден.")
+        return data
+
+    def validate(self, data):
+        """
+        Общая валидация данных.
+        Проверяет согласованность между 'assignments' и 'selectedProducts'.
+        """
+        assignments = data.get('assignments')
+        selected_products = data.get('selectedProducts')
+
+        if assignments and selected_products:
+            for department_name in assignments.keys():
+                if department_name not in selected_products:
+                     raise serializers.ValidationError({
+                         "assignments": f"Департамент '{department_name}' из назначений отсутствует в списке выбранных продуктов/направлений."
+                     })
+        
+        # Пример дополнительной валидации:
+        # if not data.get('phone') and not data.get('email'):
+        #     raise serializers.ValidationError(
+        #         {"non_field_errors": "Необходимо указать телефон или email."}
+        #     )
+
+        return data
 
 
 class InquirySerializer(serializers.ModelSerializer):

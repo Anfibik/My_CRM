@@ -10,6 +10,7 @@ from .views import (
     # Новые представления для задач
     TaskViewSet, TaskDiscussionViewSet, TaskAttachmentViewSet, TaskChangeLogViewSet,
     MyKanbanTasksView,
+    ManualLeadCreateAPIView, # Добавляем наш новый APIView
 )
 
 
@@ -39,6 +40,8 @@ urlpatterns = [
     path('companies/<int:pk>/', CompanyDetailView.as_view(), name='company-detail'),
     path('contacts/', ContactListCreateView.as_view(), name='contact-list-create'),
     path('contacts/<int:pk>/', ContactDetailView.as_view(), name='contact-detail'),
+
+    path('leads/create_manual/', ManualLeadCreateAPIView.as_view(), name='lead-create-manual'),
     
     path('inquiries/<int:pk>/convert/', convert_inquiry_view, name='inquiry-convert'),
     

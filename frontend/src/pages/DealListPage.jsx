@@ -1,6 +1,7 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import api from '../api/config';
 import { useNavigate, Link } from 'react-router-dom';
+import { DEPARTMENT_LABELS } from '../constants';
 
 // Отображение человекопонятных названий статусов сделок
 const statusLabels = {
@@ -119,7 +120,9 @@ const DealListPage = () => {
                     </Link>
                   </td>
                   <td className="py-1 px-3 text-left">{`${new Date(deal.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${new Date(deal.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</td>
-                  <td className="py-1 px-3 text-left">{deal.department || '—'}</td>
+                  <td className="py-1 px-3 text-left">
+                  {DEPARTMENT_LABELS[deal.department] || deal.department || '—'}
+                </td>
                   <td className="py-1 px-3 text-left">{deal.responsible ? deal.responsible.full_name : '—'}</td>
                   <td className={`py-1 px-3 text-left ${deal.status === 'need' ? 'text-red-500 font-semibold' : ''}`}>{statusLabels[deal.status] || deal.status}</td>
                   {/* <td className="py-1 px-3 text-center">

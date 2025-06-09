@@ -1,7 +1,11 @@
-from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser, Task
+from .models import Inquiry, Contact, Company, Lead, Deal, DealEvent, NextStep, CustomUser, Task, DEPARTMENT_CHOICES
 import datetime
 from django.utils import timezone
+from django.db import transaction
 
+# Создаем глобальный словарь для обратного преобразования
+# { "ШМБ": "warehouses", "Стеллажные системы": "shelving_systems", ... }
+REVERSE_DEPARTMENT_MAP = {label: value for value, label in DEPARTMENT_CHOICES}
 
 def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     """
@@ -61,17 +65,30 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     )
 
     # 4. Создание Deal(ов) для каждого продукта
-    products_list = department_assignments.keys() if isinstance(department_assignments, dict) else []
-    for department in products_list:
+    # Ключи в department_assignments - это отображаемые имена департаментов
+    assigned_display_departments = department_assignments.keys() if isinstance(department_assignments, dict) else []
+    
+    for display_name in assigned_display_departments:
         responsible = None
-        user_id = department_assignments.get(department)
+        user_id = department_assignments.get(display_name)
         if user_id:
             responsible = CustomUser.objects.filter(id=user_id).first()
+
+        # Получаем техническое имя департамента
+        technical_department_name = REVERSE_DEPARTMENT_MAP.get(display_name)
+
+        if not technical_department_name:
+            # Если по какой-то причине отображаемое имя не найдено в наших CHOICES,
+            # нужно решить, что делать. Можно пропустить, записать как есть с предупреждением, или выдать ошибку.
+            # Для начала, можно вывести предупреждение и пропустить создание такой сделки.
+            print(f"ПРЕДУПРЕЖДЕНИЕ: Техническое имя для департамента '{display_name}' не найдено. Сделка для этого департамента не будет создана.")
+            continue 
+
         deal = Deal.objects.create(
             lead=lead,
-            department=department,
-            validated_need="",
-            status="need",
+            department=technical_department_name, # Используем техническое имя
+            validated_need="", # Это поле, возможно, тоже нужно будет заполнять осмысленно
+            status="need", # Начальный статус сделки
             responsible=responsible
         )
         # Создаем следующий шаг
@@ -112,6 +129,134 @@ def convert_inquiry(inquiry: Inquiry, department_assignments=None):
     inquiry.save()
 
     return lead  
+
+
+@transaction.atomic # Гарантирует, что все операции либо выполнятся, либо откатятся
+def create_lead_manually(validated_data, creating_user: CustomUser):
+    """
+    Создает лид, компанию, контакт, сделки и задачи на основе данных, 
+    полученных из ManualLeadCreateSerializer.
+    """
+    full_name = validated_data['fullName']
+    phone = validated_data.get('phone')
+    email = validated_data.get('email')
+    messenger = validated_data.get('messenger')
+    company_name = validated_data['companyName']
+    company_site = validated_data.get('companySite')
+    need_description = validated_data['needDescription']
+    assignments = validated_data['assignments'] # { department_display_name: responsible_user_id }
+
+    # 1. Обработка Company
+    company = None
+    if company_name:
+        company, created = Company.objects.get_or_create(
+            name__iexact=company_name,
+            defaults={'name': company_name, 'site': company_site or ""}
+        )
+        if not created and company_site and not company.site:
+            company.site = company_site
+            company.save(update_fields=['site'])
+
+    # 2. Обработка Contact
+    contact_qs = Contact.objects.none()
+    if phone:
+        contact_qs = Contact.objects.filter(phone=phone)
+    if not contact_qs.exists() and email:
+        contact_qs = Contact.objects.filter(email__iexact=email)
+    
+    contact = contact_qs.first()
+
+    if contact:
+        contact.name = full_name
+        if messenger and contact.messenger != messenger:
+            contact.messenger = messenger
+        if company and contact.company != company:
+            contact.company = company
+        contact.save()
+    else:
+        contact = Contact.objects.create(
+            name=full_name,
+            phone=phone or "",
+            email=email or "",
+            messenger=messenger or "",
+            company=company
+        )
+
+    if company and not company.main_contact:
+        company.main_contact = contact
+        company.save(update_fields=['main_contact'])
+
+    # 3. Создание лида
+    lead = Lead.objects.create(
+        contact=contact,
+        need=need_description,
+        department_assignments=assignments, 
+        status="new",
+        source='manual'
+    )
+
+    # 4. Создание Deal(ов), NextStep, DealEvent, Task
+    department_map = {label: value for value, label in DEPARTMENT_CHOICES}
+
+    for department_display_name, responsible_user_id in assignments.items():
+        responsible_user = CustomUser.objects.filter(id=responsible_user_id).first()
+        if not responsible_user:
+            # Log this, should be caught by serializer
+            continue
+
+        department_value = department_map.get(department_display_name)
+        if not department_value:
+            # Log this, should be caught by serializer
+            continue
+        
+        deal_name = f"Сделка по '{department_display_name}' для '{company.name if company else contact.name}'"
+        deal = Deal.objects.create(
+            lead=lead,
+            name=deal_name,
+            department=department_value,
+            status="need",
+            responsible=responsible_user
+        )
+
+        # Определяем дедлайн для следующего шага
+        # Пример: следующий рабочий день в 10:00
+        reference_time = timezone.now()
+        next_business_day = get_next_workday_date(reference_time.date())
+        due_date_next_step = timezone.make_aware(datetime.datetime.combine(next_business_day, datetime.time(10,0)), timezone.get_current_timezone())
+
+        next_step_description = "Первичный контакт с клиентом"
+        next_step = NextStep.objects.create(
+            deal=deal,
+            description=next_step_description,
+            deadline=due_date_next_step,
+            assigned_to=responsible_user,
+            status="open"
+        )
+        
+        deal_event_content = f"Лид и сделка созданы вручную. Направление: '{department_display_name}'. Потребность: {lead.need}"
+        DealEvent.objects.create(
+            deal=deal,
+            pipeline=deal.status, # Начальный статус сделки, на момент создания события
+            event_type='comment',
+            content=deal_event_content,
+            next_step=next_step,
+            created_by=creating_user
+        )
+        
+        if deal.responsible:
+            Task.objects.create(
+                deal=deal,
+                title=f"{deal.name} - {next_step_description}",
+                description=f"Детали: {deal_event_content}",
+                deadline=next_step.deadline,
+                task_type='call',
+                priority='high',
+                status='pending',
+                author=creating_user,
+                executor=deal.responsible
+            )
+    return lead
+
 
 # Функции для определения рабочих дней и интервалов для задач
 def get_workday_task_interval(target_date):
