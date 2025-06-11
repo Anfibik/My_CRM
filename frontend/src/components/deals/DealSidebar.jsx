@@ -2,11 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, Typography, Divider, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Autocomplete, TextField, Chip, Tabs, Tab } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import { DEPARTMENT_LABELS } from '../../constants';
+import { formatPhoneNumberUA } from '../../utils/utils';
 
 const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, onUpdateParticipants, selectedAccount, onAccountChange, onUpdateAccount }) => {
   const lead = deal.lead || {};
   const contact = lead.contact || {};
   const company = contact.company || {};
+
+  let primaryPhoneNumber = '—';
+  if (contact && contact.phone_numbers && contact.phone_numbers.length > 0) {
+    const workPrimaryPhone = contact.phone_numbers.find(
+      pn => pn.phone_type === 'WORK_PRIMARY' || pn.type === 'WORK_PRIMARY'
+    );
+    if (workPrimaryPhone) {
+      primaryPhoneNumber = workPrimaryPhone.phone_number;
+    }
+  }
   
   // Стиль для меток
   const labelStyle = {
@@ -120,7 +131,7 @@ const DealSidebar = ({ deal, users, selectedParticipants, onParticipantsChange, 
         <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
           <Box component="span" sx={labelStyle}>Телефон . . . </Box>
           <Box component="span" sx={valueStyle}>
-            <span>{contact.phone || '—'}</span>
+            <span>{formatPhoneNumberUA(primaryPhoneNumber)}</span>
             {contact.messenger && <span style={{ marginLeft: '4px' }}>({contact.messenger})</span>}
           </Box>
         </Box>

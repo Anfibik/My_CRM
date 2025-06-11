@@ -9,7 +9,7 @@ const ContactListPage = () => {
   const [editingContact, setEditingContact] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }],
+    phone_numbers: [{ phone_number: '', type: 'WORK_PRIMARY' }],
     email: '',
     messenger: '',
     company: ''
@@ -22,7 +22,7 @@ const ContactListPage = () => {
   const handleAddPhoneNumber = () => {
     setFormData((prev) => ({
         ...prev,
-        phone_numbers: [...prev.phone_numbers, { phone_number: '', phone_type: 'WORK_PRIMARY' }]
+        phone_numbers: [...prev.phone_numbers, { phone_number: '', type: 'WORK_PRIMARY' }]
     }));
   };
 
@@ -75,7 +75,7 @@ const ContactListPage = () => {
         setEditingContact(null);
         setFormData({ 
             name: '', 
-            phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }], 
+            phone_numbers: [{ phone_number: '', type: 'WORK_PRIMARY' }], 
             email: '', 
             messenger: '', 
             company: '' 
@@ -90,8 +90,8 @@ const ContactListPage = () => {
     setFormData({
         name: contact.name || '',
         phone_numbers: contact.phone_numbers && contact.phone_numbers.length > 0 
-                       ? contact.phone_numbers.map(pn => ({...pn, phone_type: pn.phone_type || pn.type || 'WORK_PRIMARY'})) 
-                       : [{ phone_number: '', phone_type: 'WORK_PRIMARY' }],
+                       ? contact.phone_numbers 
+                       : [{ phone_number: '', type: 'WORK_PRIMARY' }],
         email: contact.email || '',
         messenger: contact.messenger || '',
         company: contact.company ? (typeof contact.company === 'object' ? contact.company.name : contact.company) : ''
@@ -185,7 +185,7 @@ const ContactListPage = () => {
 
                 <td className="py-1 px-6 text-left align-middle">
                   {contact.phone_numbers && contact.phone_numbers.length > 0
-                    ? `${contact.phone_numbers[0].phone_number} (${PHONE_TYPE_LABELS[contact.phone_numbers[0].phone_type] || contact.phone_numbers[0].phone_type})`
+                    ? `${contact.phone_numbers[0].phone_number} (${PHONE_TYPE_LABELS[contact.phone_numbers[0].type] || contact.phone_numbers[0].type})`
                     : 'Не указан'}
                 </td>
                 <td className="py-1 px-3 text-left">{contact.email}</td>
@@ -249,8 +249,8 @@ const ContactListPage = () => {
                       className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                     />
                     <select
-                      value={pn.phone_type}
-                      onChange={(e) => handlePhoneNumberChange(index, 'phone_type', e.target.value)}
+                      value={pn.type}
+                      onChange={(e) => handlePhoneNumberChange(index, 'type', e.target.value)}
                       className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                     >
                       {PHONE_TYPE_OPTIONS.map(opt => (
@@ -324,7 +324,7 @@ const ContactListPage = () => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingContact(null);
-                    setFormData({ name: '', phone_numbers: [{ phone_number: '', phone_type: 'WORK_PRIMARY' }], email: '', messenger: '', company: '' });
+                    setFormData({ name: '', phone_numbers: [{ phone_number: '', type: 'WORK_PRIMARY' }], email: '', messenger: '', company: '' });
                   }}
                   className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                 >

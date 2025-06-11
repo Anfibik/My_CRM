@@ -256,10 +256,10 @@ def create_lead_manually(validated_data, creating_user: CustomUser):
             # Log this, should be caught by serializer
             continue
         
-        deal_name = f"Сделка по '{department_display_name}' для '{company.name if company else contact.name}'"
+        # deal_name = f"Сделка по '{department_display_name}' для '{company.name if company else contact.name}'"
         deal = Deal.objects.create(
             lead=lead,
-            name=deal_name,
+            # name=deal_name,
             department=department_value,
             status="need",
             responsible=responsible_user

@@ -136,7 +136,7 @@ const ContactDetailPage = () => {
           contact.phone_numbers.map((pn, index) => (
             <DetailItem 
               key={`phone-${index}`} 
-              label={`Телефон (${PHONE_TYPE_LABELS[pn.phone_type] || pn.phone_type})`} 
+              label={`Телефон (${PHONE_TYPE_LABELS[pn.type] || pn.type})`} 
               value={pn.phone_number} 
             />
           ))

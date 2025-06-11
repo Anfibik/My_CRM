@@ -238,7 +238,7 @@ const InquiryListPage = () => {
                             onCancel={() => setShowModal(false)}
                             initialData={{ 
                                 fullName: "", 
-                                phone_numbers: [{ phone_number: "+380", phone_type: "WORK_PRIMARY" }], 
+                                phone_numbers: [{ phone_number: "+380", type: "WORK_PRIMARY" }], 
                                 email: "", 
                                 messenger: "", 
                                 companyName: "", 
