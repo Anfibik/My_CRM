@@ -60,6 +60,7 @@ const formatDateTimeModule = (dateTimeString) => {
 // showInteractionButtons: флаг, показывать ли кнопки взаимодействия (Принять/Завершить) при наведении
 // onTaskUpdate: функция обратного вызова для обновления задачи в родительском компоненте
 const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons = true, onTaskUpdate }) => {
+  const theme = useTheme(); // Добавляем theme
   // --- ХУКИ И СОСТОЯНИЕ ---
   const navigate = useNavigate(); // Хук для программной навигации
   // Состояния для отслеживания наведения мыши на элементы (для показа кнопок)
@@ -155,9 +156,6 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
         height: '150px', // Фиксированная высота
         width: '170px',  // Фиксированная ширина
         cursor: isDraggable ? 'grab' : 'pointer', // Курсор в зависимости от возможности перетаскивания
-        // Граница для задач с высоким приоритетом
-        border: task.priority === 'high' ? '3px solid' : 'none',
-        borderColor: task.priority === 'high' ? 'error.main' : undefined,
         backgroundColor: 'white', // Основной фон карточки
         '&:hover': { // Стили при наведении (не для перетаскивания)
           boxShadow: 4
@@ -166,9 +164,22 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
         // Стили для закрытых задач (полупрозрачность, другой фон)
         ...(isTaskClosed && {
           opacity: 0.6,
-          backgroundColor: 'rgba(162, 162, 162, 0.83)',
+          backgroundColor: 'rgba(162, 162, 162, 0.83)', 
         }),
-        border: task.task_type === 'step' ? '2px solid #FFC107' : undefined, // Желтая рамка
+        // Логика для рамок с приоритетами:
+        ...(task.status === 'completed' ? { // 1. Наивысший приоритет: Выполненные задачи
+          border: `2px solid ${theme.palette.success.main}`,
+          borderColor: theme.palette.success.main,
+        } : task.priority === 'high' ? { // 2. Затем: Задачи с высоким приоритетом (если не 'completed')
+          border: `3px solid ${theme.palette.error.main}`,
+          borderColor: theme.palette.error.main,
+        } : task.task_type === 'step' ? { // 3. Затем: Задачи типа "шаг воронки" (если не 'completed' и не 'high priority')
+          border: `2px solid #FFC107`, // Желтая рамка
+          borderColor: '#FFC107',
+        } : { // 4. По умолчанию (если ни одно из вышеперечисленных условий не выполнено)
+          border: `1px solid ${theme.palette.divider}`, // Стандартная рамка
+          borderColor: theme.palette.divider,
+        })
       }}
       // Клик по карточке ведет на страницу задачи
       onClick={() => {

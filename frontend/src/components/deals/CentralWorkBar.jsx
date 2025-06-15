@@ -34,7 +34,9 @@ const CentralWorkBar = ({
   }, [navigate]);
 
   // Фильтр для активных задач (все, что не 'closed')
-  const activeTasksFilter = useCallback((task) => task.status !== 'closed', []);
+  const activeTasksFilter = useCallback((task) => task.status !== 'closed' && task.status !== 'completed', []);
+  const CompletedTasksFilter = useCallback((task) => task.status == 'completed', []);
+
 
   return (
     <Box sx={{ width: '100%', px: 0.5 }}>
@@ -111,6 +113,16 @@ const CentralWorkBar = ({
           title="Активные задачи" 
           clientSideFilter={activeTasksFilter} 
           CardComponent={TaskCard} 
+        />
+
+        {/* Область для выполненных задач */}
+        <TasksArea 
+          key="accept-tasks"
+          deal={deal} 
+          title="Выполненные задачи" 
+          CardComponent={TaskCard} 
+          showAddTaskButton={false}
+          apiStatusFilter="completed"
         />
 
         {/* Область для закрытых задач (Архив) */}

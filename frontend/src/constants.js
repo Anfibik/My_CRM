@@ -58,6 +58,7 @@ export const TASK_TYPE_LABELS = {
   delivery: "Доставка",
   universal: "Общая",
   step: "Шаг",
+  stage_funnel: "Воронка",
 };
 
 export const PRIORITY_LABELS = {
