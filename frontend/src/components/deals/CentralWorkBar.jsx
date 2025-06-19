@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import api from '../../api/config';
 import { Box, Divider } from '@mui/material';
 import TasksArea from '../tasks/TasksArea';
 import TaskCard, { CompactTaskCard } from '../tasks/TaskCard';
@@ -14,8 +15,58 @@ const CentralWorkBar = ({
   lastEventCreatedAt,
   lastNextStepDue,
 }) => {
+  const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
-  // Авто-скейлирующий textarea: минимум 4 строки, без ручного ресайза
+  const fetchTasks = useCallback(async (dealId) => {
+    if (!dealId) {
+      setTasks([]);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/api/tasks/?deal=${dealId}`);
+      const sortedTasks = (response.data || []).sort((a, b) => {
+        const aDeadline = a.deadline ? new Date(a.deadline) : null;
+        const bDeadline = b.deadline ? new Date(b.deadline) : null;
+        if (!aDeadline && !bDeadline) return 0;
+        if (!aDeadline) return -1;
+        if (!bDeadline) return 1;
+        return aDeadline - bDeadline;
+      });
+      setTasks(sortedTasks);
+    } catch (err) {
+      console.error("Ошибка при загрузке задач:", err);
+      setError("Не удалось загрузить задачи. Попробуйте позже.");
+      setTasks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTasks(deal?.id);
+  }, [deal?.id, fetchTasks]);
+
+  const handleTaskUpdate = (updatedTask) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task))
+    );
+  };
+
+  const handleTaskCreated = (createdTask) => {
+    setTasks(prevTasks => [createdTask, ...prevTasks]);
+  };
+
+  const handleNavigateToTask = useCallback((task) => {
+    if (task && task.id) {
+      navigate(`/tasks/${task.id}`);
+    }
+  }, [navigate]);
+
   const textAreaRef = useRef(null);
   useEffect(() => {
     const ta = textAreaRef.current;
@@ -25,24 +76,14 @@ const CentralWorkBar = ({
     }
   }, [eventText]);
 
-  const navigate = useNavigate();
-
-  const handleNavigateToTask = useCallback((task) => {
-    if (task && task.id) {
-      navigate(`/tasks/${task.id}`);
-    }
-  }, [navigate]);
-
-  // Фильтр для активных задач (все, что не 'closed')
-  const activeTasksFilter = useCallback((task) => task.status !== 'closed' && task.status !== 'completed', []);
-  const CompletedTasksFilter = useCallback((task) => task.status == 'completed', []);
-
+  const activeTasks = tasks.filter(task => !['completed', 'closed'].includes(task.status));
+  const completedTasks = tasks.filter(task => task.status === 'completed');
+  const closedTasks = tasks.filter(task => task.status === 'closed');
 
   return (
     <Box sx={{ width: '100%', px: 0.5 }}>
       <main className="p-2 m-1 bg-green-50 rounded shadow">
         <div className="flex items-start">
-          {/* Левая часть — Ввод результата шага */}
           <div className="w-1/2">
             <textarea
               ref={textAreaRef}
@@ -72,7 +113,6 @@ const CentralWorkBar = ({
               </button>
             </div>
           </div>
-          {/* Правая часть — Информация о результате и следующем шаге */}
           <div className="w-1/2 p-2 bg-blue-50 rounded shadow ml-2">
             <h3 className="font-bold text-lg mb-1 flex justify-between">
               <span>Крайний результат</span>
@@ -106,32 +146,39 @@ const CentralWorkBar = ({
             </p>
           </div>
         </div>
-        {/* Область для активных задач */}
-        <TasksArea 
+        <TasksArea
           key="active-tasks"
-          deal={deal} 
-          title="Активные задачи" 
-          clientSideFilter={activeTasksFilter} 
-          CardComponent={TaskCard} 
+          deal={deal}
+          title="Активные задачи"
+          tasks={activeTasks}
+          isLoading={isLoading}
+          error={error}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskCreated={handleTaskCreated}
+          CardComponent={TaskCard}
         />
-
-        {/* Область для выполненных задач */}
-        <TasksArea 
-          key="accept-tasks"
-          deal={deal} 
-          title="Выполненные задачи" 
-          CardComponent={TaskCard} 
+        <TasksArea
+          key="completed-tasks"
+          deal={deal}
+          title="Выполненные задачи"
+          tasks={completedTasks}
+          isLoading={isLoading}
+          error={error}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskCreated={handleTaskCreated}
+          CardComponent={TaskCard}
           showAddTaskButton={false}
-          apiStatusFilter="completed"
         />
-
-        {/* Область для закрытых задач (Архив) */}
-        <TasksArea 
+        <TasksArea
           key="archive-tasks"
-          deal={deal} 
-          title="Архив задач" 
-          apiStatusFilter="closed" 
-          CardComponent={CompactTaskCard} 
+          deal={deal}
+          title="Архив задач"
+          tasks={closedTasks}
+          isLoading={isLoading}
+          error={error}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskCreated={handleTaskCreated}
+          CardComponent={CompactTaskCard}
           onCardClick={handleNavigateToTask}
           showAddTaskButton={false}
           titleVariant='subtitle1'
