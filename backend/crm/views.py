@@ -6,6 +6,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
@@ -303,6 +304,41 @@ API для управления задачами. Поддерживает CRUD-
     def perform_create(self, serializer):
         # Автоматически устанавливаем текущего пользователя как автора
         serializer.save(author=self.request.user)
+
+    def partial_update(self, request, *args, **kwargs):
+        task = self.get_object()
+        user = request.user
+        new_status = request.data.get('status')
+
+        if new_status and new_status != task.status: # Проверяем, только если статус действительно меняется
+            is_author = (task.author == user)
+            is_executor = (task.executor == user)
+            is_participant = task.participants.filter(id=user.id).exists()
+
+            if new_status == 'closed':
+                if not is_author:
+                    raise PermissionDenied(
+                        {"detail": "Только автор может закрыть задачу."}
+                    )
+            else: # Любой другой статус, кроме 'closed'
+                can_change_to_other_statuses = is_executor or is_participant
+
+                if is_author and not can_change_to_other_statuses:
+                    # Автор, который не является ни исполнителем, ни участником,
+                    # пытается изменить статус на что-то, кроме 'closed'.
+                    raise PermissionDenied(
+                        {"detail": "Автор (не являющийся исполнителем или участником) может менять статус задачи только на 'закрыто'."}
+                    )
+                elif not is_author and not can_change_to_other_statuses:
+                    # Пользователь не автор, не исполнитель и не участник (например, наблюдатель).
+                    raise PermissionDenied(
+                        {"detail": f"У вас нет прав на изменение статуса этой задачи на '{new_status}'."}
+                    )
+                # Если пользователь является исполнителем или участником (и, возможно, автором),
+                # он может изменять статус на любой, кроме 'closed' (это обрабатывается выше).
+                # Никаких дополнительных действий здесь не требуется, просто переходим к super().
+        
+        return super().partial_update(request, *args, **kwargs)
         
     def perform_update(self, serializer):
         # Фиксируем изменения в TaskChangeLog

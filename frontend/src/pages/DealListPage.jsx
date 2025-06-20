@@ -95,6 +95,7 @@ const DealListPage = () => {
               <th className="py-3 px-6 text-left">Статус</th>
               {/* <th className="py-3 px-6 text-center">Глубина</th> */}
               <th className="py-3 px-6 text-center">Задачи</th>
+              <th className="py-3 px-6 text-center">События</th>
             </tr>
           </thead>
           <tbody className="text-gray-600 text-sm font-light">
@@ -154,6 +155,9 @@ const DealListPage = () => {
                         ) : null; 
                       })()}
                     </div>
+                  </td>
+                  <td> 
+                    {/* Цифровое отображение непросмотренных событий по данной сделке */}
                   </td>
                 </tr>
               );

@@ -21,6 +21,8 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import WarningIcon from '@mui/icons-material/Warning';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Исправленный путь
+import { TASK_TYPE_LABELS } from '../../constants.js';
+import { useAuth } from '../../context/AuthContext.js';
 
 const TaskDetail = () => {
   const theme = useTheme(); // Вызываем хук useTheme в начале компонента
@@ -32,7 +34,7 @@ const TaskDetail = () => {
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
-  
+
   // Состояния для диалоговых окон редактирования участников и наблюдателей
   const [participantsDialogOpen, setParticipantsDialogOpen] = useState(false);
   const [observersDialogOpen, setObserversDialogOpen] = useState(false);
@@ -41,10 +43,12 @@ const TaskDetail = () => {
   const [isUpdatingParticipants, setIsUpdatingParticipants] = useState(false);
   const [isUpdatingObservers, setIsUpdatingObservers] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
-  
+
   // Состояние для управления выпадающим меню статусов
   const [statusAnchorEl, setStatusAnchorEl] = useState(null);
   const statusMenuOpen = Boolean(statusAnchorEl);
+  const { user: currentUser } = useAuth();
+  const [availableStatuses, setAvailableStatuses] = useState([]);
 
   // Загрузка данных задачи
   useEffect(() => {
@@ -80,7 +84,7 @@ const TaskDetail = () => {
 
     fetchTask();
   }, [id]);
-  
+
   // Загрузка списка доступных пользователей
   useEffect(() => {
     const fetchUsers = async () => {
@@ -94,6 +98,32 @@ const TaskDetail = () => {
 
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (task && currentUser && currentUser.id) {
+      const currentUserId = currentUser.id;
+      const isAuthor = task.author_details?.id === currentUserId;
+      const isExecutor = task.executor_details?.id === currentUserId;
+      const isParticipant = task.participants_details?.some(p => p.id === currentUserId);
+
+      let statusesToShow = [];
+      const allNonClosedStatuses = ['not_accepted', 'pending', 'accepted', 'in_progress', 'completed'];
+
+      if (isAuthor) {
+        statusesToShow.push('closed');
+        if (isExecutor || isParticipant) {
+          statusesToShow.push(...allNonClosedStatuses);
+        }
+      } else {
+        if (isExecutor || isParticipant) {
+          statusesToShow.push(...allNonClosedStatuses);
+        }
+      }
+      setAvailableStatuses([...new Set(statusesToShow)]);
+    } else {
+      setAvailableStatuses([]);
+    }
+  }, [task, currentUser]);
 
   // Обработчики действий
   const handleSubmitComment = async () => {
@@ -120,6 +150,16 @@ const TaskDetail = () => {
     }
   };
 
+  const handleCommentKeyDown = (event) => {
+    // Отправляем комментарий по Enter, если не нажат Shift
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // Предотвращаем перенос строки
+      if (newComment.trim()) { // Проверяем, что комментарий не пустой
+        handleSubmitComment();
+      }
+    }
+  };
+
   const handleChangeStatus = async (newStatus) => {
     try {
       setChangingStatus(true);
@@ -134,12 +174,12 @@ const TaskDetail = () => {
       setStatusAnchorEl(null); // Закрываем меню после изменения статуса
     }
   };
-  
+
   // Обработчики для выпадающего меню статусов
   const handleStatusClick = (event) => {
     setStatusAnchorEl(event.currentTarget);
   };
-  
+
   const handleStatusClose = () => {
     setStatusAnchorEl(null);
   };
@@ -149,7 +189,7 @@ const TaskDetail = () => {
     // Устанавливаем текущих участников из задачи
     setSelectedParticipants(task.participants || []);
     setParticipantsDialogOpen(true);
-    
+
     // Если список пользователей пуст, попробуем загрузить его еще раз
     if (availableUsers.length === 0) {
       const fetchUsers = async () => {
@@ -172,7 +212,7 @@ const TaskDetail = () => {
     // Устанавливаем текущих наблюдателей из задачи
     setSelectedObservers(task.observers || []);
     setObserversDialogOpen(true);
-    
+
     // Если список пользователей пуст, попробуем загрузить его еще раз
     if (availableUsers.length === 0) {
       const fetchUsers = async () => {
@@ -198,12 +238,12 @@ const TaskDetail = () => {
       const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
         participants: selectedParticipants
       });
-      setTask(prevTask => ({ 
+      setTask(prevTask => ({
         ...prevTask,
         participants: response.data.participants,
         participants_details: response.data.participants_details || []
       }));
-      
+
       setParticipantsDialogOpen(false);
     } catch (err) {
       console.error('Ошибка при обновлении списка участников:', err);
@@ -218,12 +258,12 @@ const TaskDetail = () => {
       const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
         observers: selectedObservers
       });
-      setTask(prevTask => ({ 
+      setTask(prevTask => ({
         ...prevTask,
         observers: response.data.observers,
         observers_details: response.data.observers_details || []
       }));
-      
+
       setObserversDialogOpen(false);
     } catch (err) {
       console.error('Ошибка при обновлении списка наблюдателей:', err);
@@ -291,7 +331,7 @@ const TaskDetail = () => {
   };
 
   const getStatusColor = (status) => {
-    
+
     const colors = {
       'not_accepted': 'error',     // красный
       'pending': 'warning',        // оранжевый
@@ -331,24 +371,24 @@ const TaskDetail = () => {
     return labels[type] || 'Универсальная';
   };
 
-  const getDepartmentLabel = useCallback((departmentCode) => { 
+  const getDepartmentLabel = useCallback((departmentCode) => {
     if (!departmentCode) return '';
     const departments = {
-        "warehouses": "ШМБ",
-        "racks": "Стеллажные системы",
-        "warehouses_machines": "Складская техника",
-        "plastic_containers": "Пластиковая тара",
-        "trash_bins": "Мусорные баки",
-        "sorting_systems": "Системы сортировки",
-        "automation": "Автоматизация",
-        "services": "Сервисные услуги",
-        "administrations": "Администрация",
-        "logistics": "Логистика",
-        "finance": "Финансы и бухгалтерия",
-        "marketing": "Маркетинг",
+      "warehouses": "ШМБ",
+      "racks": "Стеллажные системы",
+      "warehouses_machines": "Складская техника",
+      "plastic_containers": "Пластиковая тара",
+      "trash_bins": "Мусорные баки",
+      "sorting_systems": "Системы сортировки",
+      "automation": "Автоматизация",
+      "services": "Сервисные услуги",
+      "administrations": "Администрация",
+      "logistics": "Логистика",
+      "finance": "Финансы и бухгалтерия",
+      "marketing": "Маркетинг",
     };
     return departments[departmentCode] || departmentCode;
-  }, []); 
+  }, []);
 
   const getRoleLabel = useCallback((roleCode) => {
     if (!roleCode) return '';
@@ -373,7 +413,7 @@ const TaskDetail = () => {
 
   // Группировка и сортировка участников по ДЕПАРТАМЕНТАМ
   const groupedAndSortedParticipants = useMemo(() => {
-    if (!task || !task.participants_details || task.participants_details.length === 0) { 
+    if (!task || !task.participants_details || task.participants_details.length === 0) {
       return [];
     }
 
@@ -387,7 +427,7 @@ const TaskDetail = () => {
     }, {});
 
     const sortedDepartmentLabels = Object.keys(groups).sort((a, b) => a.localeCompare(b)); // Сортируем названия департаментов
-    
+
     return sortedDepartmentLabels.map(departmentLabel => ({
       departmentLabel, // Используем departmentLabel
       participants: groups[departmentLabel]
@@ -501,7 +541,7 @@ const TaskDetail = () => {
                     } else {
                       fontWeight = 'regular';
                     }
-                    
+
                     return (
                       <Typography
                         variant="body2"
@@ -511,22 +551,22 @@ const TaskDetail = () => {
                         {deadlineInfo.text}
                       </Typography>
                     );
-                  })()} 
+                  })()}
                 </Box>
               </Box>
             </Box>
           </Box>
 
           {/* Блок для иконки дедлайна */}
-          <Box sx={{ 
-            width: '7%', 
-            px: 1, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center' 
+          <Box sx={{
+            width: '7%',
+            px: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
           }}>
             {(() => {
-              const deadlineInfo = getDeadlineInfo(task?.deadline); 
+              const deadlineInfo = getDeadlineInfo(task?.deadline);
               let iconElement;
 
               switch (deadlineInfo.iconName) {
@@ -548,7 +588,7 @@ const TaskDetail = () => {
           {/* Центральный блок (70%) - название и идентификатор */}
           <Box sx={{ width: '65%', px: 1 }}>
             <Box
-              sx={{ 
+              sx={{
                 width: '100%',
                 pb: 1,
                 borderRadius: 3,
@@ -565,9 +605,9 @@ const TaskDetail = () => {
                 backgroundColor: '#f8f9fa'
               }}
             >
-              <Typography 
-                variant="h6" 
-                sx={{ 
+              <Typography
+                variant="h6"
+                sx={{
                   fontWeight: 600,
                   lineHeight: 1.3,
                   mb: 0.5,
@@ -577,10 +617,10 @@ const TaskDetail = () => {
               >
                 {task?.title}
               </Typography>
-              
-              <Box sx={{ 
-                mt: 1.5, 
-                display: 'flex', 
+
+              <Box sx={{
+                mt: 1.5,
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#455a64',
@@ -589,10 +629,10 @@ const TaskDetail = () => {
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {task?.author_details?.full_name} ({getDepartmentLabel(task?.author_details?.department)})
                 </Typography>
-                
-                <Box sx={{ 
-                  mx: 2, 
-                  display: 'flex', 
+
+                <Box sx={{
+                  mx: 2,
+                  display: 'flex',
                   alignItems: 'center',
                   color: '#90a4ae'
                 }}>
@@ -600,7 +640,7 @@ const TaskDetail = () => {
                   <ArrowBackIcon sx={{ transform: 'rotate(180deg)', mx: 1, fontSize: '1.2rem' }} />
                   <Box sx={{ height: '2px', width: '30px', bgcolor: '#cfd8dc' }} />
                 </Box>
-                
+
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {task?.executor_details?.full_name} ({getDepartmentLabel(task?.executor_details?.department)})
                 </Typography>
@@ -610,27 +650,27 @@ const TaskDetail = () => {
 
           {/* Правый блок (10%) - статус */}
           <Box sx={{ width: '10%', pl: 1 }}>
-            <Box 
-              sx={{ 
-                width: '100%', 
+            <Box
+              sx={{
+                width: '100%',
                 height: '40px',
                 borderRadius: '20px',
-                bgcolor: task?.status === 'closed' ? 'grey.700' : `${getStatusColor(task?.status)}.light`, 
+                bgcolor: task?.status === 'closed' ? 'grey.700' : `${getStatusColor(task?.status)}.light`,
                 color: task?.status === 'closed' ? '#fff' : `${getStatusColor(task?.status)}.contrastText`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: changingStatus ? 'default' : 'pointer',
-                opacity: changingStatus ? 0.7 : 1,
+                cursor: (changingStatus || availableStatuses.length === 0) ? 'default' : 'pointer',
+                opacity: (changingStatus || availableStatuses.length === 0) ? 0.5 : 1,
                 transition: 'background-color 0.3s'
               }}
-              onClick={changingStatus ? undefined : handleStatusClick}
+              onClick={(changingStatus || availableStatuses.length === 0) ? undefined : handleStatusClick}
             >
-              <Typography 
-                noWrap 
-                sx={{ 
-                  fontWeight: 'medium', 
-                  fontSize: '0.875rem', 
+              <Typography
+                noWrap
+                sx={{
+                  fontWeight: 'medium',
+                  fontSize: '0.875rem',
                   px: 1,
                   textAlign: 'center',
                   maxWidth: '100%',
@@ -641,62 +681,57 @@ const TaskDetail = () => {
                 {getStatusLabel(task?.status)}
               </Typography>
             </Box>
-            
+
             <Menu
               anchorEl={statusAnchorEl}
               open={statusMenuOpen}
               onClose={handleStatusClose}
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-              PaperProps={{ sx: { maxHeight: 300, overflow: 'auto' } }}
+              PaperProps={{ sx: { maxHeight: 300, overflow: 'auto', width: '200px' } }}
             >
-              {[
-                { value: 'not_accepted', label: 'Не принята' },
-                { value: 'pending', label: 'В ожидании' },
-                { value: 'accepted', label: 'Принята' },
-                { value: 'in_progress', label: 'В работе' },
-                { value: 'completed', label: 'Выполнена' },
-                { value: 'closed', label: 'Закрыта' }
-              ].map((status) => (
-                <MenuItem
-                  key={status.value}
-                  onClick={() => handleChangeStatus(status.value)}
-                  selected={task?.status === status.value}
-                  disabled={task?.status === status.value || changingStatus}
-                  sx={{ 
-                    px: 2, 
-                    py: 1,
-                    '&.Mui-selected': {
-                      bgcolor: 'rgba(0, 0, 0, 0.04)'
-                    }
-                  }}
-                >
-                  <Box sx={{ 
-                    width: '100%', 
-                    height: '28px',
-                    borderRadius: '14px',
-                    bgcolor: status.value === 'closed' ? 'grey.700' : `${getStatusColor(status.value)}.light`, 
-                    color: status.value === 'closed' ? '#fff' : `${getStatusColor(status.value)}.contrastText`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Typography 
-                      noWrap 
-                      sx={{ 
-                        fontWeight: 'medium', 
-                        fontSize: '0.875rem', 
-                        px: 1,
-                        maxWidth: '100%',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      {status.label}
-                    </Typography>
-                  </Box>
-                </MenuItem>
-              ))}
+              {(() => {
+                const orderedStatusesForMenu = [
+                  { value: 'not_accepted', label: getStatusLabel('not_accepted') },
+                  { value: 'pending', label: getStatusLabel('pending') },
+                  { value: 'accepted', label: getStatusLabel('accepted') },
+                  { value: 'in_progress', label: getStatusLabel('in_progress') },
+                  { value: 'completed', label: getStatusLabel('completed') },
+                  { value: 'closed', label: getStatusLabel('closed') }
+                ];
+                return orderedStatusesForMenu.map((statusOption) => {
+                  if (availableStatuses.includes(statusOption.value)) {
+                    return (
+                      <MenuItem
+                        key={statusOption.value}
+                        onClick={() => {
+                          handleChangeStatus(statusOption.value);
+                          // handleStatusClose(); // Закрытие меню теперь в handleChangeStatus
+                        }}
+                        selected={task?.status === statusOption.value}
+                        disabled={task?.status === statusOption.value || changingStatus}
+                      >
+                        <Box sx={{
+                          width: '100%',
+                          height: '28px',
+                          borderRadius: '14px',
+                          bgcolor: statusOption.value === 'closed' ? 'grey.700' : `${getStatusColor(statusOption.value)}.light`,
+                          color: statusOption.value === 'closed' ? '#fff' : `${getStatusColor(statusOption.value)}.contrastText`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          px: 1,
+                        }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 500, fontSize: '0.8rem' }}>
+                            {statusOption.label}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    );
+                  }
+                  return null;
+                });
+              })()}
             </Menu>
           </Box>
         </Box>
@@ -705,54 +740,109 @@ const TaskDetail = () => {
         <Box sx={{ display: 'flex', height: 'calc(100vh - 150px)' }}>
           {/* Левая колонка с информацией */}
           <Box sx={{ width: '320px', p: 2, borderRight: '1px solid #ccc', height: '100%', overflow: 'auto' }}>
+            {/* Название сделки как ссылка */}
+            <Box sx={{ mb: 1 }}> {/* Outer Box for Сделка */}
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}> {/* Label color changed to secondary */}
+                Сделка:
+              </Typography>
+              {task.deal ? (
+                <Box
+                  component="a"
+                  href={`/deals/${task.deal}`}
+                  sx={{
+                    textDecoration: 'none',
+                    '&:hover': { textDecoration: 'underline' },
+                    display: 'block',
+                    fontSize: '0.85rem',
+                    pl: theme.spacing(1) // Indent value
+                  }}
+                >
+                  {task.deal_details?.name}
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.85rem', pl: theme.spacing(1) }}> {/* Value color changed to primary */}
+                  Не указана
+                </Typography>
+              )}
+            </Box>
+
+            {/* Блок с информацией о компании и контакте сделки */}
+            {task?.deal_details?.lead && (
+              <Box sx={{ mt: 1, mb: 1.5 }}>
+                {task.deal_details.lead.company?.name && (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}> {/* Label color changed */}
+                      Компания:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.85rem', pl: theme.spacing(1) }}> {/* Value color changed */}
+                      {task.deal_details.lead.company.name}
+                    </Typography>
+                  </Box>
+                )}
+                {task.deal_details.lead.contact?.name && (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}> {/* Label color changed */}
+                      Контакт:
+                    </Typography>
+                    {task.deal_details.lead.contact.id ? (
+                      <Box
+                        component="a"
+                        href={`/contacts/${task.deal_details.lead.contact.id}`}
+                        sx={{
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                          display: 'block',
+                          fontSize: '0.85rem',
+                          pl: theme.spacing(1)
+                        }}
+                      >
+                        {task.deal_details.lead.contact.name}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.85rem', pl: theme.spacing(1) }}>
+                        {task.deal_details.lead.contact.name}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+                {task.deal_details.lead.contact?.phone_numbers?.[0]?.phone_number && (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}> {/* Label color changed */}
+                      Телефон:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.85rem', pl: theme.spacing(1) }}> {/* Value color changed */}
+                      {task.deal_details.lead.contact.phone_numbers[0].phone_number}
+                      {task.deal_details.lead.contact.messenger && ` (${task.deal_details.lead.contact.messenger})`}
+                    </Typography>
+                  </Box>
+                )}
+                {task.deal_details.lead.contact?.email && (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}> {/* Label color changed */}
+                      Email:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.85rem', pl: theme.spacing(1) }}> {/* Value color changed */}
+                      {task.deal_details.lead.contact.email}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+            {/* Горизонтальная черта */}
+            <Box sx={{ my: 1.5 }}>
+              <Divider />
+            </Box>
             {/* Тип задачи */}
             <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
               <Box component="span" sx={{ color: 'text.secondary', width: '92px', flexShrink: 0, minWidth: '92px', fontSize: '0.85rem' }}>
                 Тип задачи:
               </Box>
-              <Box component="span" sx={{ color: 'text.primary' }}>
-                {(() => {
-                  switch (task.task_type) {
-                    case 'approval': return 'Согласование';
-                    case 'payment': return 'Оплата';
-                    case 'delivery': return 'Доставка';
-                    case 'universal': return 'Универсальная';
-                    default: return task.task_type || 'Не указан';
-                  }
-                })()}
+              <Box component="span" sx={{ color: 'text.primary', fontSize: '0.85rem' }}>
+                {TASK_TYPE_LABELS[task.task_type] || task.task_type || 'Не указан'}
               </Box>
             </Box>
-
-            {/* Название сделки как ссылка */}
-            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-              <Box component="span" sx={{ color: 'text.secondary', width: '92px', flexShrink: 0, minWidth: '92px', fontSize: '0.85rem' }}>
-                Сделка:
-              </Box>
-              <Box component="span" sx={{ color: 'text.primary', maxWidth: 'calc(100% - 92px)', overflow: 'hidden' }}>
-                {task.deal ? (
-                  <Box 
-                    component="a" 
-                    href={`/deals/${task.deal}`} 
-                    sx={{ 
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: 'block',
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    {task.deal_details?.name} 
-                  </Box>
-                ) : (
-                  'Не указана'
-                )}
-              </Box>
-            </Box>
-
-            {/* Горизонтальная черта */}
+            
+            {/* Горизонтальная черта перед исполнителем */}
             <Box sx={{ my: 1.5 }}>
               <Divider />
             </Box>
@@ -854,25 +944,25 @@ const TaskDetail = () => {
               {task.participants_details && task.participants_details.length > 0 ? (
                 // Если участники добавлены
                 <>
-                  <Box 
+                  <Box
                     component="span"
                     onClick={handleOpenParticipantsDialog}
-                    sx={{ 
-                      color: 'text.secondary', 
-                      width: '92px', 
-                      flexShrink: 0, 
+                    sx={{
+                      color: 'text.secondary',
+                      width: '92px',
+                      flexShrink: 0,
                       minWidth: '92px',
                       fontSize: '0.85rem',
                       cursor: 'pointer',
-                      display: 'inline-flex', 
+                      display: 'inline-flex',
                       alignItems: 'center'
                     }}
                   >
-                    <Typography variant="subtitle1" sx={{ 
+                    <Typography variant="subtitle1" sx={{
                       fontWeight: 'bold', // Жирный шрифт для 'Участники'
                       color: 'grey.800', // Темно-серый цвет для 'Участники'
                       fontSize: '1rem', // Немного больший шрифт для 'Участники'
-                      mr: 1 
+                      mr: 1
                     }}>
                       Участники:
                     </Typography>
@@ -881,10 +971,10 @@ const TaskDetail = () => {
               ) : (
                 // Если участники не добавлены
                 <>
-                  <Box 
+                  <Box
                     component="button"
                     onClick={handleOpenParticipantsDialog}
-                    sx={{ 
+                    sx={{
                       color: 'text.secondary',
                       backgroundColor: 'grey.100',
                       border: '1px solid',
@@ -905,52 +995,52 @@ const TaskDetail = () => {
                 </>
               )}
             </Box>
-            
+
             {/* Список участников */}
-            <Box sx={{ 
-              display: 'flex', 
-              flexWrap: 'wrap', 
-              gap: 0.5, 
-              p: '1px', 
-              mb: 1, 
-              ml: 2 
+            <Box sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 0.5,
+              p: '1px',
+              mb: 1,
+              ml: 2
             }}>
               {groupedAndSortedParticipants.length > 0 ? (
                 groupedAndSortedParticipants.map((group, groupIndex) => (
-                  <Box 
-                    key={group.departmentLabel} 
-                    sx={{ 
-                      width: '100%', 
-                      mb: 0.75, 
+                  <Box
+                    key={group.departmentLabel}
+                    sx={{
+                      width: '100%',
+                      mb: 0.75,
                       // Применяем borderBottom ко всем, кроме последнего элемента
                       borderBottom: groupIndex < groupedAndSortedParticipants.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
                       pb: groupIndex < groupedAndSortedParticipants.length - 1 ? 0.75 : 0 // Убираем padding-bottom у последнего элемента тоже
                     }}
-                  > 
-                    <Typography 
-                      variant="subtitle2" 
-                      component="div" 
-                      sx={{ 
-                        fontWeight: 'normal', 
-                        color: 'grey.600', 
-                        fontSize: '0.875rem', 
-                        mb: 0.25, 
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      component="div"
+                      sx={{
+                        fontWeight: 'normal',
+                        color: 'grey.600',
+                        fontSize: '0.875rem',
+                        mb: 0.25,
                         width: '100%'
                       }}
                     >
                       {group.departmentLabel}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', pt: 0.25 }}> 
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', width: '100%', pt: 0.25 }}>
                       {group.participants.map((participant, index) => (
                         <Chip
                           key={participant.id}
                           label={participant.full_name}
                           size="small"
-                          deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />} 
+                          deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
                           onDelete={(e) => { e.stopPropagation(); removeParticipant(participant.id); }}
                           sx={{
-                            width: 'calc(50% - 2px)', 
-                            margin: '1px',             
+                            width: 'calc(50% - 2px)',
+                            margin: '1px',
                             boxSizing: 'border-box',
                             // Важно: index теперь относится к списку участников *внутри группы*
                             paddingRight: index % 2 === 0 ? theme.spacing(0.5) : 0,
@@ -959,17 +1049,17 @@ const TaskDetail = () => {
                             color: 'grey.800',
                             fontSize: '0.65rem',
                             height: 24,
-                            display: 'flex', 
-                            alignItems: 'center', 
+                            display: 'flex',
+                            alignItems: 'center',
                             '& .MuiChip-label': {
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              minWidth: 0, 
-                              flexGrow: 1, 
+                              minWidth: 0,
+                              flexGrow: 1,
                             },
                             '& .MuiChip-deleteIcon': {
-                              flexShrink: 0, 
+                              flexShrink: 0,
                             }
                           }}
                         />
@@ -985,28 +1075,35 @@ const TaskDetail = () => {
               {task.observers_details && task.observers_details.length > 0 ? (
                 // Если наблюдатели добавлены
                 <>
-                  <Box 
+                  <Box
                     component="span"
                     onClick={handleOpenObserversDialog}
-                    sx={{ 
-                      color: 'text.secondary', 
-                      width: '92px', 
-                      flexShrink: 0, 
-                      minWidth: '92px',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
+                    sx={{
+                      // width: '92px', // Убрано для гибкости Typography
+                      // flexShrink: 0, 
+                      // minWidth: '92px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center'
                     }}
                   >
-                    Наблюдатели:
+                    <Typography variant="subtitle1" sx={{
+                      fontWeight: 'bold',
+                      color: 'grey.800',
+                      fontSize: '1rem',
+                      mr: 1
+                    }}>
+                      Наблюдатели:
+                    </Typography>
                   </Box>
                 </>
               ) : (
                 // Если наблюдатели не добавлены
                 <>
-                  <Box 
+                  <Box
                     component="button"
                     onClick={handleOpenObserversDialog}
-                    sx={{ 
+                    sx={{
                       color: 'text.secondary',
                       backgroundColor: 'grey.100',
                       border: '1px solid',
@@ -1027,7 +1124,7 @@ const TaskDetail = () => {
                 </>
               )}
             </Box>
-            
+
             {/* Список наблюдателей */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, p: '1px', mb: 2, ml: 2 }}>
               {task.observers_details && task.observers_details.length > 0 ? (
@@ -1044,24 +1141,24 @@ const TaskDetail = () => {
                       deleteIcon={<CancelIcon sx={{ fontSize: 16, color: 'grey.800' }} />}
                       onDelete={(e) => { e.stopPropagation(); removeObserver(observer.id); }}
                       sx={{
-                        width: 'calc(50% - 2px)', 
-                        margin: '1px',             
+                        width: 'calc(50% - 2px)',
+                        margin: '1px',
                         boxSizing: 'border-box',
                         bgcolor: 'grey.300',
                         color: 'grey.800',
                         fontSize: '0.65rem',
                         height: 24,
-                        display: 'flex', 
-                        alignItems: 'center', 
+                        display: 'flex',
+                        alignItems: 'center',
                         '& .MuiChip-label': {
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          minWidth: 0, 
-                          flexGrow: 1, 
+                          minWidth: 0,
+                          flexGrow: 1,
                         },
                         '& .MuiChip-deleteIcon': {
-                          flexShrink: 0, 
+                          flexShrink: 0,
                         }
                       }}
                     />
@@ -1074,7 +1171,7 @@ const TaskDetail = () => {
           {/* Основная область контента */}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Описание задачи */}
-            <Box sx={{ flex: 1, p: 2, overflowY: 'auto', mr: '30px' }}>
+            <Box sx={{ height: '60%', p: 2, overflowY: 'auto', mr: '30px' }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Форма заполнения, детализация, описание
               </Typography>
@@ -1084,13 +1181,13 @@ const TaskDetail = () => {
             </Box>
 
             {/* Обсуждение */}
-            <Box sx={{ height: '200px', borderTop: '1px solid #ccc', p: 2, mr: '30px' }}>
+            <Box sx={{ height: '40%', display: 'flex', flexDirection: 'column', borderTop: '1px solid #ccc', p: 2, mr: '30px' }}>
               <Typography variant="h6" gutterBottom>
                 Обсуждение
               </Typography>
 
               {task?.discussions?.length > 0 ? (
-                <Box sx={{ maxHeight: '130px', overflowY: 'auto' }}>
+                <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 1 }}>
                   {task.discussions.map(discussion => (
                     <Box key={discussion.id} sx={{ mb: 1 }}>
                       <Typography variant="caption" fontWeight="bold">
@@ -1116,6 +1213,7 @@ const TaskDetail = () => {
                   placeholder="Введите комментарий..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={handleCommentKeyDown}
                   disabled={submittingComment}
                   sx={{ mr: 1 }}
                 />
@@ -1133,17 +1231,6 @@ const TaskDetail = () => {
         </Box>
       </Paper>
 
-      {/* Кнопка возврата */}
-      <Box sx={{ mt: 2 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
-          variant="outlined"
-        >
-          Назад к списку задач
-        </Button>
-      </Box>
-      
       {/* Диалоговое окно для редактирования участников */}
       <Dialog open={participantsDialogOpen} onClose={handleCloseParticipantsDialog} fullWidth maxWidth="sm">
         <DialogTitle>Управление участниками задачи</DialogTitle>
@@ -1152,7 +1239,7 @@ const TaskDetail = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Добавьте участников, которые будут работать над задачей совместно с исполнителем.
             </Typography>
-            
+
             {/* Список доступных пользователей */}
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -1168,8 +1255,8 @@ const TaskDetail = () => {
                     return !isAuthor && !isExecutor && !isAdmin;
                   }).
                   map(user => (
-                    <Box 
-                      key={user.id} 
+                    <Box
+                      key={user.id}
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1219,7 +1306,7 @@ const TaskDetail = () => {
                           })()}
                         </Typography>
                       </Box>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedParticipants.includes(user.id)}
                         color="primary"
                         size="small"
@@ -1228,11 +1315,11 @@ const TaskDetail = () => {
                   ))
                 }
                 {availableUsers.filter(user => {
-                    const isAuthor = task.author_details && user.id === task.author_details.id;
-                    const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
-                  }).length === 0 && (
+                  const isAuthor = task.author_details && user.id === task.author_details.id;
+                  const isExecutor = task.executor_details && user.id === task.executor_details.id;
+                  const isAdmin = user.is_admin; // администратор Django
+                  return !isAuthor && !isExecutor && !isAdmin;
+                }).length === 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ p: 1, fontStyle: 'italic' }}>
                       Нет доступных пользователей
                     </Typography>
@@ -1240,7 +1327,7 @@ const TaskDetail = () => {
                 }
               </Box>
             </Box>
-            
+
             {/* Выбранные участники */}
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -1264,15 +1351,15 @@ const TaskDetail = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={handleCloseParticipantsDialog} 
+          <Button
+            onClick={handleCloseParticipantsDialog}
             disabled={isUpdatingParticipants}
           >
             Отмена
           </Button>
-          <Button 
-            onClick={handleSaveParticipants} 
-            variant="contained" 
+          <Button
+            onClick={handleSaveParticipants}
+            variant="contained"
             disabled={isUpdatingParticipants}
             startIcon={isUpdatingParticipants ? <CircularProgress size={16} color="inherit" /> : null}
           >
@@ -1280,7 +1367,7 @@ const TaskDetail = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Диалоговое окно для редактирования наблюдателей */}
       <Dialog open={observersDialogOpen} onClose={handleCloseObserversDialog} fullWidth maxWidth="sm">
         <DialogTitle>Управление наблюдателями задачи</DialogTitle>
@@ -1289,7 +1376,7 @@ const TaskDetail = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Добавьте наблюдателей, которые будут получать уведомления о ходе выполнения задачи.
             </Typography>
-            
+
             {/* Список доступных пользователей */}
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -1305,8 +1392,8 @@ const TaskDetail = () => {
                     return !isAuthor && !isExecutor && !isAdmin;
                   }).
                   map(user => (
-                    <Box 
-                      key={user.id} 
+                    <Box
+                      key={user.id}
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1356,7 +1443,7 @@ const TaskDetail = () => {
                           })()}
                         </Typography>
                       </Box>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedObservers.includes(user.id)}
                         color="info"
                         size="small"
@@ -1365,11 +1452,11 @@ const TaskDetail = () => {
                   ))
                 }
                 {availableUsers.filter(user => {
-                    const isAuthor = task.author_details && user.id === task.author_details.id;
-                    const isExecutor = task.executor_details && user.id === task.executor_details.id;
-                    const isAdmin = user.is_admin; // администратор Django
-                    return !isAuthor && !isExecutor && !isAdmin;
-                  }).length === 0 && (
+                  const isAuthor = task.author_details && user.id === task.author_details.id;
+                  const isExecutor = task.executor_details && user.id === task.executor_details.id;
+                  const isAdmin = user.is_admin; // администратор Django
+                  return !isAuthor && !isExecutor && !isAdmin;
+                }).length === 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ p: 1, fontStyle: 'italic' }}>
                       Нет доступных пользователей
                     </Typography>
@@ -1377,7 +1464,7 @@ const TaskDetail = () => {
                 }
               </Box>
             </Box>
-            
+
             {/* Выбранные наблюдатели */}
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -1400,15 +1487,15 @@ const TaskDetail = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={handleCloseObserversDialog} 
+          <Button
+            onClick={handleCloseObserversDialog}
             disabled={isUpdatingObservers}
           >
             Отмена
           </Button>
-          <Button 
-            onClick={handleSaveObservers} 
-            variant="contained" 
+          <Button
+            onClick={handleSaveObservers}
+            variant="contained"
             disabled={isUpdatingObservers}
             startIcon={isUpdatingObservers ? <CircularProgress size={16} color="inherit" /> : null}
           >

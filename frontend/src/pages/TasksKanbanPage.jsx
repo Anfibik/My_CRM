@@ -5,6 +5,7 @@ import { STATUS_LABELS } from '../constants';
 import { getStatusLabel, getStatusColor } from '../utils/taskUtils'; 
 import KanbanBoardComponent from '../components/tasks/KanbanBoardComponent';
 import TaskFiltersComponent from '../components/tasks/TaskFiltersComponent';
+import { useAuth } from '../context/AuthContext'; // Импорт useAuth
 
 const COLUMN_ORDER = [
   'not_accepted',
@@ -70,6 +71,7 @@ const getColumnHeaderStyling = (statusKey) => {
 };
 
 const MyTasksKanbanPage = () => {
+  const { user: currentUser } = useAuth(); // Получение currentUser
   const [tasksByStatus, setTasksByStatus] = useState({});
   const [orderedStatuses, setOrderedStatuses] = useState(COLUMN_ORDER); 
   const [isLoading, setIsLoading] = useState(true);
@@ -137,6 +139,46 @@ const MyTasksKanbanPage = () => {
       return;
     }
 
+    // Находим перемещаемую задачу ДО того, как она будет удалена из startColumnTasks
+    const startColumnKeyForLookup = source.droppableId;
+    const tasksInStartColumnForLookup = Array.from(tasksByStatus[startColumnKeyForLookup] || []);
+    const movedTaskOriginal = tasksInStartColumnForLookup.find(task => task.id.toString() === draggableId);
+
+    if (!movedTaskOriginal) {
+      console.error("Перемещаемая задача не найдена! ID:", draggableId);
+      // Можно добавить уведомление пользователю или более сложную обработку
+      return; // Задача не найдена, выходим
+    }
+    
+    // Определяем роли пользователя для задачи
+    const isAuthorCheck = currentUser && typeof movedTaskOriginal.author !== 'undefined' && movedTaskOriginal.author === currentUser.id;
+    // Предполагаем, что assignee - это ID. Если это объект, то movedTaskOriginal.assignee?.id
+    const isAssigneeCheck = currentUser && typeof movedTaskOriginal.assignee !== 'undefined' && movedTaskOriginal.assignee === currentUser.id; 
+    // Предполагаем, что participants - это массив ID, а не объектов
+    const isParticipantCheck = currentUser && Array.isArray(movedTaskOriginal.participants) && movedTaskOriginal.participants.includes(currentUser.id);
+    
+    const isObserver = currentUser && !isAuthorCheck && !isAssigneeCheck && !isParticipantCheck;
+
+    // НОВОЕ ПРАВИЛО: Автор может перемещать задачу ТОЛЬКО в колонку "closed"
+    // и только если это действительно другая колонка
+    if (isAuthorCheck && destination.droppableId !== source.droppableId && destination.droppableId !== 'closed') {
+      return; // Молча предотвращаем перемещение, если автор пытается переместить не в "closed"
+    }
+
+    // Если пользователь - наблюдатель и пытается изменить статус (переместить в другую колонку)
+    if (isObserver && destination.droppableId !== source.droppableId) {
+      return; // Молча предотвращаем перемещение
+    }
+
+    // Существующая проверка: только автор может переместить задачу в "Закрыто"
+    if (destination.droppableId === 'closed' && !isAuthorCheck) {
+      return; // Молча предотвращаем перемещение
+    }
+
+    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) { // Повторная проверка, т.к. предыдущая была для !destination
+      return;
+    }
+
     if (destination.droppableId === 'not_accepted' && source.droppableId !== 'not_accepted') {
       console.warn("Attempted to drag task into 'not_accepted' column. Operation denied.");
       return; 
@@ -144,25 +186,31 @@ const MyTasksKanbanPage = () => {
 
     const startColumnKey = source.droppableId;
     const finishColumnKey = destination.droppableId;
-    const startColumnTasks = Array.from(tasksByStatus[startColumnKey] || []);
-    const [movedTask] = startColumnTasks.splice(source.index, 1);
+    
+    // Используем movedTaskOriginal для получения originalTaskStatus, 
+    // а для оптимистичного обновления и API будем использовать копию, которую извлечем ниже
+    const originalTaskStatus = movedTaskOriginal.status; 
 
-    const originalTaskStatus = movedTask.status; 
+    // Оптимистичное обновление UI
+    const newTasksByStatusState = { ...tasksByStatus };
+    const sourceTasks = Array.from(newTasksByStatusState[startColumnKey] || []);
+    const [taskToMoveOptimistic] = sourceTasks.splice(source.index, 1); // Извлекаем задачу для перемещения
+    newTasksByStatusState[startColumnKey] = sourceTasks;
+
+    const destinationTasks = Array.from(newTasksByStatusState[finishColumnKey] || []);
+    // Обновляем статус у копии задачи перед вставкой
+    const updatedTaskForOptimisticUI = { ...taskToMoveOptimistic, status: finishColumnKey }; 
+    destinationTasks.splice(destination.index, 0, updatedTaskForOptimisticUI);
+    newTasksByStatusState[finishColumnKey] = destinationTasks;
+
+    setTasksByStatus(newTasksByStatusState);
+
+    // API вызов для обновления статуса
+    // movedTask здесь должна быть задачей, которую мы действительно отправляем на сервер (taskToMoveOptimistic)
+    // или, если быть точным, ее ID и новый статус. 
     let taskSuccessfullyUpdatedOnApi = false;
 
-    setTasksByStatus(prevTasks => {
-      const newTasks = { ...prevTasks };
 
-      newTasks[startColumnKey] = startColumnTasks;
-
-      const updatedMovedTask = { ...movedTask, status: finishColumnKey };
-
-      const finishColumnTasks = Array.from(newTasks[finishColumnKey] || []);
-      finishColumnTasks.splice(destination.index, 0, updatedMovedTask);
-      newTasks[finishColumnKey] = finishColumnTasks;
-
-      return newTasks;
-    });
 
     if (originalTaskStatus !== finishColumnKey) {
       api.patch(`/api/tasks/${draggableId}/`, { status: finishColumnKey })
@@ -189,7 +237,8 @@ const MyTasksKanbanPage = () => {
             revertedTasks[finishColumnKey] = currentFinishTasks.filter(task => task.id.toString() !== draggableId);
 
             const currentStartTasks = Array.from(revertedTasks[startColumnKey] || []);
-            const taskToRevert = { ...movedTask, status: originalTaskStatus }; 
+            // Используем movedTaskOriginal для возврата
+            const taskToRevert = { ...movedTaskOriginal, status: originalTaskStatus }; 
             currentStartTasks.splice(source.index, 0, taskToRevert);
             revertedTasks[startColumnKey] = currentStartTasks;
 

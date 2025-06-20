@@ -18,7 +18,22 @@ const CentralWorkBar = ({
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [allUsers, setAllUsers] = useState([]); // Состояние для хранения всех пользователей
   const navigate = useNavigate();
+
+  // Загрузка всех пользователей при монтировании компонента
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      try {
+        const response = await api.get('/api/users/'); // Эндпоинт для получения всех пользователей
+        setAllUsers(response.data || []);
+      } catch (err) {
+        console.error("Ошибка при загрузке всех пользователей:", err);
+        setAllUsers([]); // В случае ошибки устанавливаем пустой массив
+      }
+    };
+    fetchAllUsers();
+  }, []); // Пустой массив зависимостей для выполнения один раз
 
   const fetchTasks = useCallback(async (dealId) => {
     if (!dealId) {
@@ -156,6 +171,7 @@ const CentralWorkBar = ({
           onTaskUpdate={handleTaskUpdate}
           onTaskCreated={handleTaskCreated}
           CardComponent={TaskCard}
+          users={allUsers} // Передача списка всех пользователей
         />
         <TasksArea
           key="completed-tasks"
