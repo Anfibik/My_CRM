@@ -467,6 +467,7 @@ class TaskSerializer(serializers.ModelSerializer):
     priority_display = serializers.CharField(source='get_priority_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     deal_details = DealSerializer(source='deal', read_only=True)
+    assignee = serializers.ReadOnlyField(source='executor.id')  # Добавляем ID исполнителя как 'assignee'
     
     class Meta:
         model = Task

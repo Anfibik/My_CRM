@@ -72,9 +72,22 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
 
   // Определение ролей пользователя для задачи
   const isAuthor = currentUser && typeof task.author !== 'undefined' && task.author === currentUser.id;
-  const isAssignee = currentUser && typeof task.assignee !== 'undefined' && task.assignee === currentUser.id;
+
+  // Улучшенная проверка на исполнителя (справляется с ID и объектом)
+  const assigneeId = task.assignee?.id ?? task.assignee;
+  const isAssignee = currentUser && assigneeId === currentUser.id;
+
   const isParticipant = currentUser && Array.isArray(task.participants) && task.participants.includes(currentUser.id);
+
+  // Пользователь может выполнять действия, если он исполнитель или участник.
+  // Роль исполнителя имеет приоритет над автором.
+  const canTakeAction = isAssignee || isParticipant;
+
   const isObserver = currentUser && !isAuthor && !isAssignee && !isParticipant;
+
+  // --- DEBUG LOGS ---
+  console.log(`--- DEBUG TaskCard #${task.id} ---\n    User ID: ${currentUser?.id}\n    Author ID: ${task.author}\n    Assignee ID (raw): ${JSON.stringify(task.assignee)}\n    Assignee ID (parsed): ${assigneeId}\n    Is Assignee: ${isAssignee}\n    Is Participant: ${isParticipant}\n    CAN TAKE ACTION: ${canTakeAction}\n  -------------------------`);
+  // --- END DEBUG LOGS ---
 
   // Состояния для отслеживания процесса выполнения API-запросов (принятие/завершение задачи)
   const [isAccepting, setIsAccepting] = useState(false);
@@ -366,7 +379,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
                   variant="outlined"
                   color="secondary"
                   onClick={handleAcceptTask}
-                  disabled={isObserver || isAuthor || isAccepting}
+                  disabled={!canTakeAction || isAccepting}
                   sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}
                 >
                   {isAccepting ? <CircularProgress size={12} sx={{ color: 'secondary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Принять'}
@@ -377,7 +390,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
                   variant="outlined"
                   color="primary"
                   onClick={handleStartProgress}
-                  disabled={isObserver || isAuthor || isStartingProgress}
+                  disabled={!canTakeAction || isStartingProgress}
                   sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}
                 >
                   {isStartingProgress ? <CircularProgress size={12} sx={{ color: 'primary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'В работу'}
@@ -425,7 +438,7 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
                 variant="outlined"
                 color="success"
                 onClick={handleCompleteTask}
-                disabled={isObserver || isAuthor || isCompleting}
+                disabled={!canTakeAction || isCompleting}
                 sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative' }}
               >
                 {isCompleting ? <CircularProgress size={12} sx={{ color: 'success.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Завершить'}

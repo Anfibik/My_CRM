@@ -150,29 +150,40 @@ const MyTasksKanbanPage = () => {
       return; // Задача не найдена, выходим
     }
     
-    // Определяем роли пользователя для задачи
-    const isAuthorCheck = currentUser && typeof movedTaskOriginal.author !== 'undefined' && movedTaskOriginal.author === currentUser.id;
-    // Предполагаем, что assignee - это ID. Если это объект, то movedTaskOriginal.assignee?.id
-    const isAssigneeCheck = currentUser && typeof movedTaskOriginal.assignee !== 'undefined' && movedTaskOriginal.assignee === currentUser.id; 
-    // Предполагаем, что participants - это массив ID, а не объектов
+    // --- ПРОВЕРКА ПРАВ ---
+    const isAuthorCheck = currentUser && movedTaskOriginal.author === currentUser.id;
+
+    // Улучшенная проверка на исполнителя (справляется с ID и объектом)
+    const assigneeId = movedTaskOriginal.assignee?.id ?? movedTaskOriginal.assignee;
+    const isAssigneeCheck = currentUser && assigneeId === currentUser.id;
+
     const isParticipantCheck = currentUser && Array.isArray(movedTaskOriginal.participants) && movedTaskOriginal.participants.includes(currentUser.id);
-    
-    const isObserver = currentUser && !isAuthorCheck && !isAssigneeCheck && !isParticipantCheck;
 
-    // НОВОЕ ПРАВИЛО: Автор может перемещать задачу ТОЛЬКО в колонку "closed"
-    // и только если это действительно другая колонка
-    if (isAuthorCheck && destination.droppableId !== source.droppableId && destination.droppableId !== 'closed') {
-      return; // Молча предотвращаем перемещение, если автор пытается переместить не в "closed"
-    }
+    // Пользователь может менять статус, если он исполнитель или участник.
+    const canChangeStatus = isAssigneeCheck || isParticipantCheck;
 
-    // Если пользователь - наблюдатель и пытается изменить статус (переместить в другую колонку)
-    if (isObserver && destination.droppableId !== source.droppableId) {
-      return; // Молча предотвращаем перемещение
-    }
+    // --- ПРИМЕНЕНИЕ ПРАВИЛ ---
+    const isChangingColumn = destination.droppableId !== source.droppableId;
 
-    // Существующая проверка: только автор может переместить задачу в "Закрыто"
-    if (destination.droppableId === 'closed' && !isAuthorCheck) {
-      return; // Молча предотвращаем перемещение
+    if (isChangingColumn) {
+      // Если пользователь может менять статус (исполнитель/участник)
+      if (canChangeStatus) {
+        if (destination.droppableId === 'closed') {
+          return; // Исполнители/участники не могут закрывать задачу
+        }
+        // В противном случае, разрешаем перемещение в другие колонки
+      } 
+      // Если пользователь - автор, но не исполнитель/участник
+      else if (isAuthorCheck) { 
+        if (destination.droppableId !== 'closed') {
+          return; // Автор может перемещать ТОЛЬКО в "closed"
+        }
+        // В противном случае, разрешаем перемещение в "closed"
+      } 
+      // Если пользователь ни автор, ни исполнитель, ни участник (т.е. наблюдатель)
+      else {
+        return; // Наблюдатели не могут менять статус
+      }
     }
 
     if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) { // Повторная проверка, т.к. предыдущая была для !destination
