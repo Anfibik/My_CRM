@@ -150,47 +150,27 @@ const MyTasksKanbanPage = () => {
       return; // Задача не найдена, выходим
     }
     
-    // --- ПРОВЕРКА ПРАВ (Feature Flag Logic) ---
+    // --- Новая, единая проверка прав на перемещение ---
+    const { permissions } = movedTaskOriginal;
+
+    // Если объект permissions отсутствует, запрещаем действие из соображений безопасности.
+    if (!permissions) {
+        setError('Не удалось определить права доступа для этой задачи. Попробуйте обновить страницу.');
+        return;
+    }
+
     const isChangingColumn = destination.droppableId !== source.droppableId;
-
     if (isChangingColumn) {
-      if (movedTaskOriginal.permissions) {
-        // НОВАЯ ЛОГИКА: используем права с бэкенда
-        const { can_change_status, can_close } = movedTaskOriginal.permissions;
-        
-        // Запрещаем, если пытаются закрыть задачу без права на закрытие
-        if (destination.droppableId === 'closed' && !can_close) {
-          return;
+      // Проверяем право на закрытие задачи
+      if (destination.droppableId === 'closed') {
+        if (!permissions.can_close) {
+          return; // У пользователя нет прав, просто отменяем действие без уведомления.
         }
-        
-        // Запрещаем, если пытаются изменить статус (в любую другую колонку) без права на это
-        if (destination.droppableId !== 'closed' && !can_change_status) {
-          return;
-        }
-      } else {
-        // СТАРАЯ ЛОГИКА (ИСПРАВЛЕННАЯ): рассчитываем права на фронтенде
-        const isAuthor = currentUser && movedTaskOriginal.author === currentUser.id;
-        const assigneeId = movedTaskOriginal.assignee?.id ?? movedTaskOriginal.assignee;
-        const isAssignee = currentUser && assigneeId === currentUser.id;
-        const isParticipant = currentUser && Array.isArray(movedTaskOriginal.participants) && movedTaskOriginal.participants.includes(currentUser.id);
-
-        const canChangeStatus = isAssignee || isParticipant;
-        const canClose = isAuthor;
-
-        const destinationIsClosed = destination.droppableId === 'closed';
-
-        // Если пытаются закрыть задачу
-        if (destinationIsClosed) {
-          if (!canClose) {
-            return; // Запрещено, если не автор
-          }
-        } 
-        // Если пытаются изменить статус (не закрыть)
-        else {
-          if (!canChangeStatus) {
-            // Запрещено, если не исполнитель/участник (автор без этих ролей может только закрывать)
-            return;
-          }
+      }
+      // Проверяем право на изменение статуса (включая "переоткрытие" из закрытых)
+      else {
+        if (!permissions.can_change_status) {
+          return; // У пользователя нет прав, просто отменяем действие без уведомления.
         }
       }
     }

@@ -476,12 +476,18 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_permissions(self, obj):
-        if settings.USE_BACKEND_PERMISSIONS:
-            user = self.context['request'].user
+        request = self.context.get('request')
+        if not request or not hasattr(request, 'user') or not request.user.is_authenticated:
             return {
-                'can_change_status': obj.user_can_change_status(user),
-                'can_close': obj.user_can_close(user)
-            }      
+                'can_change_status': False,
+                'can_close': False,
+            }
+        
+        user = request.user
+        return {
+            'can_change_status': obj.user_can_change_status(user),
+            'can_close': obj.user_can_close(user)
+        }      
     def to_representation(self, instance):
         """Расширяем представление для API - добавляем количество обсуждений и вложений"""
         data = super().to_representation(instance)

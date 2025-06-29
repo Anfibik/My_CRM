@@ -61,131 +61,63 @@ const formatDateTimeModule = (dateTimeString) => {
 // showInteractionButtons: флаг, показывать ли кнопки взаимодействия (Принять/Завершить) при наведении
 // onTaskUpdate: функция обратного вызова для обновления задачи в родительском компоненте
 const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons = true, onTaskUpdate }) => {
-  const { user: currentUser } = useAuth(); // Получаем currentUser
-  const theme = useTheme(); // Добавляем theme
-  // --- ХУКИ И СОСТОЯНИЕ ---
-  const navigate = useNavigate(); // Хук для программной навигации
-  // Состояния для отслеживания наведения мыши на элементы (для показа кнопок)
+  const theme = useTheme();
+  const navigate = useNavigate();
+
+  // --- COMPONENT STATE ---
   const [isCreateDateHovered, setIsCreateDateHovered] = useState(false);
   const [isDeadlineHovered, setIsDeadlineHovered] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Состояние для отслеживания загрузки при API-запросах
-
-  // --- РОЛИ И ПРАВА (Feature Flag Logic) ---
-  let canTakeAction, isAuthor, isObserver;
-
-  if (task.permissions) {
-    // НОВАЯ ЛОГИКА: используем права, пришедшие с бэкенда
-    canTakeAction = task.permissions.can_change_status;
-    isAuthor = !task.permissions.can_change_status && task.permissions.can_close;
-    isObserver = !task.permissions.can_change_status && !task.permissions.can_close;
-
-  } else {
-    // СТАРАЯ ЛОГИКА: рассчитываем права на фронтенде (когда флаг выключен)
-    const localIsAuthor = currentUser && task.author === currentUser.id;
-    const assigneeId = task.assignee?.id ?? task.assignee;
-    const localIsAssignee = currentUser && assigneeId === currentUser.id;
-    const localIsParticipant = currentUser && Array.isArray(task.participants) && task.participants.includes(currentUser.id);
-
-    canTakeAction = localIsAssignee || localIsParticipant;
-    isAuthor = localIsAuthor;
-    isObserver = currentUser && !localIsAuthor && !localIsAssignee && !localIsParticipant;
-  }
-
-  // Состояния для отслеживания процесса выполнения API-запросов (принятие/завершение задачи)
   const [isAccepting, setIsAccepting] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isStartingProgress, setIsStartingProgress] = useState(false);
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-  // Определяет, является ли карточка перетаскиваемой (если передан 'provided')
+  // --- DERIVED STATE & PERMISSIONS ---
   const isDraggable = !!provided;
+  const isTaskClosed = task.status === 'closed';
+  
+  // The single source of truth for action permissions, coming from the backend.
+  const canChangeStatus = task.permissions?.can_change_status || false;
 
-  // Стили для карточки в состоянии перетаскивания
   const draggingStyle = isDraggable && isDragging ? {
-    boxShadow: '0 5px 15px rgba(0,0,0,0.3)', // Тень при перетаскивании
-    backgroundColor: 'rgba(245, 245, 245, 0.9)', // Полупрозрачный фон
+    boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(245, 245, 245, 0.9)',
   } : {};
 
-  // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
-  // Флаг, указывающий, закрыта ли задача
-  const isTaskClosed = task.status === 'closed';
-
-  // Функция для форматирования даты и времени
+  // --- EVENT HANDLERS ---
   const formatDateTime = (dateString) => {
-    if (!dateString) return 'N/A'; // Если дата не указана
-    const date = new Date(dateString);
-    const options = { // Параметры форматирования
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-    };
-    return date.toLocaleDateString('ru-RU', options); // Форматирование для русской локали
+    if (!dateString) return 'N/A';
+    // Using the module-level helper function for consistency
+    return formatDateTimeModule(dateString);
   };
 
-  // Обработчик для принятия задачи
-  const handleAcceptTask = async (e) => {
-    e.stopPropagation(); // Предотвращаем всплытие события
-    if (isAccepting || !task?.id) return; // Защита от повторного вызова или отсутствия ID
-
-    setIsAccepting(true); // Устанавливаем флаг загрузки
+  // Generic handler for status changes to reduce code duplication
+  const handleStatusChange = async (newStatus, setLoading) => {
+    setLoading(true);
     try {
-      // API-запрос на изменение статуса задачи на 'accepted'
-      const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'accepted' });
-      const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
-
-      // Если есть функция обратного вызова, вызываем ее для обновления UI
-      if (onTaskUpdate) {
-        onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
-      }
-    } catch (err) {
-      console.error(`Error updating task ${task.id} to accepted:`, err);
-      // Здесь можно добавить обработку ошибок, например, показать уведомление пользователю
-    } finally {
-      setIsAccepting(false); // Сбрасываем флаг загрузки
-      setIsCreateDateHovered(false); // Сбрасываем состояние наведения (чтобы кнопка скрылась)
-    }
-  };
-
-  // Обработчик для завершения задачи
-  const handleCompleteTask = async (e) => {
-    e.stopPropagation();
-    if (isCompleting || !task?.id) return;
-
-    setIsCompleting(true);
-    try {
-      // API-запрос на изменение статуса задачи на 'completed'
-      const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'completed' });
-      const updatedTaskFromServer = response.data; // Получаем обновленную задачу от сервера
-
-      if (onTaskUpdate) {
-        onTaskUpdate(updatedTaskFromServer); // Передаем обновленную задачу от сервера
-      }
-    } catch (err) {
-      console.error(`Error updating task ${task.id} to completed:`, err);
-      // Здесь можно добавить обработку ошибок, например, показать уведомление пользователю
-    } finally {
-      setIsCompleting(false);
-      setIsDeadlineHovered(false);
-    }
-  };
-
-  const handleStartProgress = async (e) => {
-    e.stopPropagation();
-    if (!task || !task.id) {
-      console.error("ID задачи не найден, не могу начать выполнение.");
-      return;
-    }
-    setIsStartingProgress(true);
-    try {
-          const response = await api.patch(`/api/tasks/${task.id}/`, { status: 'in_progress' });
+      const response = await api.patch(`/api/tasks/${task.id}/`, { status: newStatus });
       if (onTaskUpdate) {
         onTaskUpdate(response.data);
       }
     } catch (error) {
-      console.error("Ошибка при переводе задачи в работу:", error);
+      console.error(`Ошибка при изменении статуса на ${newStatus}:`, error);
     } finally {
-      setIsStartingProgress(false);
+      setLoading(false);
     }
+  };
+
+  const handleAcceptTask = (e) => {
+    e.stopPropagation();
+    handleStatusChange('accepted', setIsAccepting);
+  };
+
+  const handleStartProgress = (e) => {
+    e.stopPropagation();
+    handleStatusChange('in_progress', setIsStartingProgress);
+  };
+
+  const handleCompleteTask = (e) => {
+    e.stopPropagation();
+    handleStatusChange('completed', setIsCompleting);
   };
 
   // --- JSX РАЗМЕТКА КАРТОЧКИ ---
@@ -204,7 +136,6 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
         '&:hover': { // Стили при наведении (не для перетаскивания)
           boxShadow: 4
         },
-        ...draggingStyle, // Применение стилей перетаскивания
         // Стили для закрытых задач (полупрозрачность, другой фон)
         ...(isTaskClosed && {
           opacity: 0.6,
@@ -347,110 +278,63 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
           </Box>
         </Box>
 
-        {/* --- НИЖНИЙ РЯД: ДАТА СОЗДАНИЯ (КНОПКА ПРИНЯТЬ), ИКОНКА ИНФО, ДАТА ДЕДЛАЙНА (КНОПКА ЗАВЕРШИТЬ) --- */}
+        {/* --- BOTTOM ROW: ACTIONS AND DATES --- */}
         <Box sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           width: '100%',
-          mt: 0.5, // Отступ сверху
-          pt: 0.5, // Внутренний отступ сверху
-          borderTop: '1px solid rgba(0,0,0,0.08)', // Верхняя граница-разделитель
+          mt: 0.5,
+          pt: 0.5,
+          borderTop: '1px solid rgba(0,0,0,0.08)',
           fontSize: '0.6rem',
-          color: isTaskClosed ? 'text.disabled' : 'text.secondary', // Цвет текста в зависимости от статуса задачи
-        }}
-        >
-          {/* Блок с датой создания / кнопкой "Принять" */}
+          color: isTaskClosed ? 'text.disabled' : 'text.secondary',
+        }}>
+          {/* Left side: Creation Date or Action Buttons */}
           <Box
-            sx={{
-              flexBasis: '45%', // Ширина блока
-              textAlign: 'left',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: '24px', // Минимальная высота для выравнивания кнопки
-            }}
-            onMouseEnter={() => setIsCreateDateHovered(true)} // Показать кнопку при наведении
-            onMouseLeave={() => setIsCreateDateHovered(false)} // Скрыть кнопку
+            sx={{ flexBasis: '45%', textAlign: 'left', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', minHeight: '24px' }}
+            onMouseEnter={() => setIsCreateDateHovered(true)}
+            onMouseLeave={() => setIsCreateDateHovered(false)}
           >
-            {showInteractionButtons && isCreateDateHovered && !isTaskClosed ? (
-              task.status === 'not_accepted' || task.status === 'pending' ? (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  onClick={handleAcceptTask}
-                  disabled={!canTakeAction || isAccepting}
-                  sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}
-                >
-                  {isAccepting ? <CircularProgress size={12} sx={{ color: 'secondary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Принять'}
-                </Button>
-              ) : task.status === 'accepted' ? (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={handleStartProgress}
-                  disabled={!canTakeAction || isStartingProgress}
-                  sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}
-                >
-                  {isStartingProgress ? <CircularProgress size={12} sx={{ color: 'primary.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'В работу'}
-                </Button>
-              ) : (
-                <Tooltip title={`Создана: ${formatDateTime(task.created_at)}`} placement="bottom-start">
-                  <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                    {formatDateTime(task.created_at)}
-                  </Typography>
-                </Tooltip>
-              )
+            {showInteractionButtons && isCreateDateHovered && !isTaskClosed && canChangeStatus ? (
+              <>
+                {(task.status === 'not_accepted' || task.status === 'pending') && (
+                  <Button size="small" variant="outlined" color="secondary" onClick={handleAcceptTask} disabled={isAccepting} sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}>
+                    {isAccepting ? <CircularProgress size={12} /> : 'Принять'}
+                  </Button>
+                )}
+                {task.status === 'accepted' && (
+                  <Button size="small" variant="outlined" color="primary" onClick={handleStartProgress} disabled={isStartingProgress} sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative', lineHeight: 'normal' }}>
+                    {isStartingProgress ? <CircularProgress size={12} /> : 'В работу'}
+                  </Button>
+                )}
+                {/* Show creation date if no action is available for the current status on this side */}
+                {!['not_accepted', 'pending', 'accepted'].includes(task.status) && (
+                   <Typography variant="caption" sx={{ pl: 0.5 }}>{formatDateTime(task.created_at)}</Typography>
+                )}
+              </>
             ) : (
-              <Tooltip title={`Создана: ${formatDateTime(task.created_at)}`} placement="bottom-start">
-                <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                  {formatDateTime(task.created_at)}
-                </Typography>
-              </Tooltip>
+              <Typography variant="caption" sx={{ pl: 0.5 }}>{formatDateTime(task.created_at)}</Typography>
             )}
           </Box>
 
-          {/* Иконка информации с всплывающей подсказкой (название и описание задачи) */}
+          {/* Center: Info Icon */}
           <Box sx={{ flexBasis: '10%', textAlign: 'center' }}>
             <InfoTooltipIcon title={task.title} description={task.description} />
           </Box>
 
-          {/* Блок с датой дедлайна / кнопкой "Завершить" */}
+          {/* Right side: Deadline or Complete Button */}
           <Box
-            sx={{
-              flexBasis: '45%',
-              textAlign: 'right',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              minHeight: '24px',
-            }}
+            sx={{ flexBasis: '45%', textAlign: 'right', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minHeight: '24px' }}
             onMouseEnter={() => setIsDeadlineHovered(true)}
             onMouseLeave={() => setIsDeadlineHovered(false)}
           >
-            {/* Условие для показа кнопки "Завершить" */}
-            {showInteractionButtons && isDeadlineHovered && !isTaskClosed && task.status === 'in_progress' ? (
-              <Button
-                size="small"
-                variant="outlined"
-                color="success"
-                onClick={handleCompleteTask}
-                disabled={!canTakeAction || isCompleting}
-                sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative' }}
-              >
-                {isCompleting ? <CircularProgress size={12} sx={{ color: 'success.main', position: 'absolute', top: '50%', left: '50%', marginTop: '-6px', marginLeft: '-6px' }} /> : 'Завершить'}
+            {showInteractionButtons && isDeadlineHovered && !isTaskClosed && canChangeStatus && ['in_progress', 'accepted'].includes(task.status) ? (
+              <Button size="small" variant="outlined" color="success" onClick={handleCompleteTask} disabled={isCompleting} sx={{ fontSize: '0.55rem', p: '2px 4px', minWidth: 'auto', position: 'relative' }}>
+                {isCompleting ? <CircularProgress size={12} /> : 'Завершить'}
               </Button>
-            ) : ( // Иначе показываем дату дедлайна
-              <Tooltip title={`Дедлайн: ${formatDateTime(task.deadline)}`} placement="bottom-end">
-                <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                  {formatDateTime(task.deadline)}
-                </Typography>
-              </Tooltip>
+            ) : (
+              <Typography variant="caption" sx={{ pr: 0.5 }}>{formatDateTime(task.deadline)}</Typography>
             )}
           </Box>
         </Box>

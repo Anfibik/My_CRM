@@ -128,11 +128,6 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- Feature Flags ---
-# Если True, используется новая система доступов с бэкенда.
-# Если False, используется старая логика доступов на фронтенде.
-USE_BACKEND_PERMISSIONS = True
-
 
 # Настройки REST Framework
 REST_FRAMEWORK = {
