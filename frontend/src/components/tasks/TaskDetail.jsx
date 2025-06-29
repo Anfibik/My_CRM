@@ -100,30 +100,22 @@ const TaskDetail = () => {
   }, []);
 
   useEffect(() => {
-    if (task && currentUser && currentUser.id) {
-      const currentUserId = currentUser.id;
-      const isAuthor = task.author_details?.id === currentUserId;
-      const isExecutor = task.executor_details?.id === currentUserId;
-      const isParticipant = task.participants_details?.some(p => p.id === currentUserId);
-
+    if (task?.permissions) {
+      const { can_change_status, can_close } = task.permissions;
       let statusesToShow = [];
-      const allNonClosedStatuses = ['not_accepted', 'pending', 'accepted', 'in_progress', 'completed'];
-
-      if (isAuthor) {
+      if (can_change_status) {
+        // Все статусы, кроме 'закрыта', доступны при наличии этого права
+        statusesToShow.push('not_accepted', 'pending', 'accepted', 'in_progress', 'completed');
+      }
+      if (can_close) {
+        // Право на закрытие задачи - отдельное
         statusesToShow.push('closed');
-        if (isExecutor || isParticipant) {
-          statusesToShow.push(...allNonClosedStatuses);
-        }
-      } else {
-        if (isExecutor || isParticipant) {
-          statusesToShow.push(...allNonClosedStatuses);
-        }
       }
       setAvailableStatuses([...new Set(statusesToShow)]);
     } else {
       setAvailableStatuses([]);
     }
-  }, [task, currentUser]);
+  }, [task]); // Зависимость теперь только от 'task'
 
   // Обработчики действий
   const handleSubmitComment = async () => {
