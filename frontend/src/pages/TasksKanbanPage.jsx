@@ -150,39 +150,48 @@ const MyTasksKanbanPage = () => {
       return; // Задача не найдена, выходим
     }
     
-    // --- ПРОВЕРКА ПРАВ ---
-    const isAuthorCheck = currentUser && movedTaskOriginal.author === currentUser.id;
-
-    // Улучшенная проверка на исполнителя (справляется с ID и объектом)
-    const assigneeId = movedTaskOriginal.assignee?.id ?? movedTaskOriginal.assignee;
-    const isAssigneeCheck = currentUser && assigneeId === currentUser.id;
-
-    const isParticipantCheck = currentUser && Array.isArray(movedTaskOriginal.participants) && movedTaskOriginal.participants.includes(currentUser.id);
-
-    // Пользователь может менять статус, если он исполнитель или участник.
-    const canChangeStatus = isAssigneeCheck || isParticipantCheck;
-
-    // --- ПРИМЕНЕНИЕ ПРАВИЛ ---
+    // --- ПРОВЕРКА ПРАВ (Feature Flag Logic) ---
     const isChangingColumn = destination.droppableId !== source.droppableId;
 
     if (isChangingColumn) {
-      // Если пользователь может менять статус (исполнитель/участник)
-      if (canChangeStatus) {
-        if (destination.droppableId === 'closed') {
-          return; // Исполнители/участники не могут закрывать задачу
+      if (movedTaskOriginal.permissions) {
+        // НОВАЯ ЛОГИКА: используем права с бэкенда
+        const { can_change_status, can_close } = movedTaskOriginal.permissions;
+        
+        // Запрещаем, если пытаются закрыть задачу без права на закрытие
+        if (destination.droppableId === 'closed' && !can_close) {
+          return;
         }
-        // В противном случае, разрешаем перемещение в другие колонки
-      } 
-      // Если пользователь - автор, но не исполнитель/участник
-      else if (isAuthorCheck) { 
-        if (destination.droppableId !== 'closed') {
-          return; // Автор может перемещать ТОЛЬКО в "closed"
+        
+        // Запрещаем, если пытаются изменить статус (в любую другую колонку) без права на это
+        if (destination.droppableId !== 'closed' && !can_change_status) {
+          return;
         }
-        // В противном случае, разрешаем перемещение в "closed"
-      } 
-      // Если пользователь ни автор, ни исполнитель, ни участник (т.е. наблюдатель)
-      else {
-        return; // Наблюдатели не могут менять статус
+      } else {
+        // СТАРАЯ ЛОГИКА (ИСПРАВЛЕННАЯ): рассчитываем права на фронтенде
+        const isAuthor = currentUser && movedTaskOriginal.author === currentUser.id;
+        const assigneeId = movedTaskOriginal.assignee?.id ?? movedTaskOriginal.assignee;
+        const isAssignee = currentUser && assigneeId === currentUser.id;
+        const isParticipant = currentUser && Array.isArray(movedTaskOriginal.participants) && movedTaskOriginal.participants.includes(currentUser.id);
+
+        const canChangeStatus = isAssignee || isParticipant;
+        const canClose = isAuthor;
+
+        const destinationIsClosed = destination.droppableId === 'closed';
+
+        // Если пытаются закрыть задачу
+        if (destinationIsClosed) {
+          if (!canClose) {
+            return; // Запрещено, если не автор
+          }
+        } 
+        // Если пытаются изменить статус (не закрыть)
+        else {
+          if (!canChangeStatus) {
+            // Запрещено, если не исполнитель/участник (автор без этих ролей может только закрывать)
+            return;
+          }
+        }
       }
     }
 

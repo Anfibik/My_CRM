@@ -550,6 +550,37 @@ class Task(models.Model):
     def __str__(self):
         return self.title
 
+    def user_can_change_status(self, user):
+        """
+        Проверяет, может ли пользователь изменять статус задачи (кроме закрытия).
+        """
+        if not user or not user.is_authenticated:
+            return False
+        # Руководители могут все
+        if hasattr(user, 'role') and user.role in ('owner', 'top_manager'):
+            return True
+
+        # Новое правило: если задача закрыта, только автор может ее "переоткрыть".
+        if self.status == 'closed':
+            return self.author == user
+
+        # Стандартное правило для открытых задач: исполнитель или участник могут менять статус.
+        is_executor = self.executor == user
+        is_participant = user in self.participants.all()
+        return is_executor or is_participant
+
+    def user_can_close(self, user):
+        """
+        Проверяет, может ли пользователь закрыть задачу.
+        """
+        if not user or not user.is_authenticated:
+            return False
+        # Руководители могут все
+        if hasattr(user, 'role') and user.role in ('owner', 'top_manager'):
+            return True
+        # Только автор может закрыть задачу
+        return self.author == user
+
 
 class TaskDiscussion(models.Model):
     """Модель для обсуждений (чат) задачи"""

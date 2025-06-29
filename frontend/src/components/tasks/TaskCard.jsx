@@ -70,24 +70,26 @@ const TaskCard = ({ task, provided, isDragging = false, showInteractionButtons =
   const [isDeadlineHovered, setIsDeadlineHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false); // Состояние для отслеживания загрузки при API-запросах
 
-  // Определение ролей пользователя для задачи
-  const isAuthor = currentUser && typeof task.author !== 'undefined' && task.author === currentUser.id;
+  // --- РОЛИ И ПРАВА (Feature Flag Logic) ---
+  let canTakeAction, isAuthor, isObserver;
 
-  // Улучшенная проверка на исполнителя (справляется с ID и объектом)
-  const assigneeId = task.assignee?.id ?? task.assignee;
-  const isAssignee = currentUser && assigneeId === currentUser.id;
+  if (task.permissions) {
+    // НОВАЯ ЛОГИКА: используем права, пришедшие с бэкенда
+    canTakeAction = task.permissions.can_change_status;
+    isAuthor = !task.permissions.can_change_status && task.permissions.can_close;
+    isObserver = !task.permissions.can_change_status && !task.permissions.can_close;
 
-  const isParticipant = currentUser && Array.isArray(task.participants) && task.participants.includes(currentUser.id);
+  } else {
+    // СТАРАЯ ЛОГИКА: рассчитываем права на фронтенде (когда флаг выключен)
+    const localIsAuthor = currentUser && task.author === currentUser.id;
+    const assigneeId = task.assignee?.id ?? task.assignee;
+    const localIsAssignee = currentUser && assigneeId === currentUser.id;
+    const localIsParticipant = currentUser && Array.isArray(task.participants) && task.participants.includes(currentUser.id);
 
-  // Пользователь может выполнять действия, если он исполнитель или участник.
-  // Роль исполнителя имеет приоритет над автором.
-  const canTakeAction = isAssignee || isParticipant;
-
-  const isObserver = currentUser && !isAuthor && !isAssignee && !isParticipant;
-
-  // --- DEBUG LOGS ---
-  console.log(`--- DEBUG TaskCard #${task.id} ---\n    User ID: ${currentUser?.id}\n    Author ID: ${task.author}\n    Assignee ID (raw): ${JSON.stringify(task.assignee)}\n    Assignee ID (parsed): ${assigneeId}\n    Is Assignee: ${isAssignee}\n    Is Participant: ${isParticipant}\n    CAN TAKE ACTION: ${canTakeAction}\n  -------------------------`);
-  // --- END DEBUG LOGS ---
+    canTakeAction = localIsAssignee || localIsParticipant;
+    isAuthor = localIsAuthor;
+    isObserver = currentUser && !localIsAuthor && !localIsAssignee && !localIsParticipant;
+  }
 
   // Состояния для отслеживания процесса выполнения API-запросов (принятие/завершение задачи)
   const [isAccepting, setIsAccepting] = useState(false);

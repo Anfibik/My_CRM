@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser, Task, TaskDiscussion, TaskChangeLog, TaskAttachment, MESSENGER_CHOICES, DEPARTMENT_CHOICES, PHONE_TYPE_CHOICES, PhoneNumber, InquiryPhoneNumber
+from django.conf import settings
 
 
 # СЕРИАЛИЗАТОРЫ ДЛЯ ТЕЛЕФОННЫХ НОМЕРОВ
@@ -468,11 +469,19 @@ class TaskSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     deal_details = DealSerializer(source='deal', read_only=True)
     assignee = serializers.ReadOnlyField(source='executor.id')  # Добавляем ID исполнителя как 'assignee'
-    
+    permissions = serializers.SerializerMethodField()
+
     class Meta:
         model = Task
         fields = '__all__'
-        
+
+    def get_permissions(self, obj):
+        if settings.USE_BACKEND_PERMISSIONS:
+            user = self.context['request'].user
+            return {
+                'can_change_status': obj.user_can_change_status(user),
+                'can_close': obj.user_can_close(user)
+            }      
     def to_representation(self, instance):
         """Расширяем представление для API - добавляем количество обсуждений и вложений"""
         data = super().to_representation(instance)

@@ -14,7 +14,7 @@ import traceback
 
 from .models import Company, Contact, Lead, Deal, Inquiry, DealEvent, NextStep, CustomUser
 from .models import Task, TaskDiscussion, TaskChangeLog, TaskAttachment
-from .permissions import IsDealAccess, NotCallOperator
+from .permissions import IsDealAccess, NotCallOperator, CanAccessTask
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
     DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer, ManualLeadCreateSerializer
 from .serializers import TaskSerializer, TaskDiscussionSerializer, TaskChangeLogSerializer, TaskAttachmentSerializer
@@ -266,7 +266,7 @@ API для управления задачами. Поддерживает CRUD-
     """
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [IsAuthenticated, NotCallOperator]
+    permission_classes = [IsAuthenticated, NotCallOperator, CanAccessTask]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -310,33 +310,17 @@ API для управления задачами. Поддерживает CRUD-
         user = request.user
         new_status = request.data.get('status')
 
-        if new_status and new_status != task.status: # Проверяем, только если статус действительно меняется
-            is_author = (task.author == user)
-            is_executor = (task.executor == user)
-            is_participant = task.participants.filter(id=user.id).exists()
-
+        if new_status and new_status != task.status:  # Проверяем, только если статус действительно меняется
             if new_status == 'closed':
-                if not is_author:
+                if not task.user_can_close(user):
                     raise PermissionDenied(
                         {"detail": "Только автор может закрыть задачу."}
                     )
-            else: # Любой другой статус, кроме 'closed'
-                can_change_to_other_statuses = is_executor or is_participant
-
-                if is_author and not can_change_to_other_statuses:
-                    # Автор, который не является ни исполнителем, ни участником,
-                    # пытается изменить статус на что-то, кроме 'closed'.
-                    raise PermissionDenied(
-                        {"detail": "Автор (не являющийся исполнителем или участником) может менять статус задачи только на 'закрыто'."}
-                    )
-                elif not is_author and not can_change_to_other_statuses:
-                    # Пользователь не автор, не исполнитель и не участник (например, наблюдатель).
+            else:  # Любой другой статус, кроме 'closed'
+                if not task.user_can_change_status(user):
                     raise PermissionDenied(
                         {"detail": f"У вас нет прав на изменение статуса этой задачи на '{new_status}'."}
                     )
-                # Если пользователь является исполнителем или участником (и, возможно, автором),
-                # он может изменять статус на любой, кроме 'closed' (это обрабатывается выше).
-                # Никаких дополнительных действий здесь не требуется, просто переходим к super().
         
         return super().partial_update(request, *args, **kwargs)
         
