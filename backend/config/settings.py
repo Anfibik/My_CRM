@@ -45,9 +45,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -132,8 +132,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Настройки REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -141,8 +141,9 @@ REST_FRAMEWORK = {
 }
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # Только для разработки!
+CORS_ALLOW_ALL_ORIGINS = False # Только для разработки!
 CORS_ALLOW_CREDENTIALS = True
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -175,6 +176,11 @@ CORS_ALLOW_HEADERS = [
 
 AUTH_USER_MODEL = 'crm.CustomUser'
 ASGI_APPLICATION = 'config.asgi.application'
+
+# Настройки для кросс-доменных cookie в режиме разработки
+# ВАЖНО: Для продакшена SESSION_COOKIE_SECURE должно быть True (и сайт должен работать по HTTPS)
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = False # Устанавливаем в False, так как локальный сервер работает по HTTP
 
 CHANNEL_LAYERS = {
     'default': {

@@ -22,6 +22,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Исправленный путь
 import { TASK_TYPE_LABELS } from '../../constants.js';
+import eventBus from '../../utils/eventBus.js';
 import { useAuth } from '../../context/AuthContext.js';
 
 const TaskDetail = () => {
@@ -115,7 +116,37 @@ const TaskDetail = () => {
     } else {
       setAvailableStatuses([]);
     }
-  }, [task]); // Зависимость теперь только от 'task'
+    }, [task]); // Зависимость теперь только от 'task'
+
+  // Подписка на WebSocket обновления для комментариев
+  useEffect(() => {
+    const handleUpdate = (event) => {
+      const data = event.detail;
+      // Проверяем, что это новый комментарий для текущей задачи
+      if (task && data.model === 'discussion' && data.task_id === task.id) {
+        const newComment = data.instance;
+        // Проверяем, что такого комментария еще нет, чтобы избежать дублирования
+        // Используем функциональное обновление, чтобы не зависеть от замыкания task
+        setTask(prevTask => {
+          if (prevTask && !prevTask.discussions.some(d => d.id === newComment.id)) {
+            console.log('Adding new discussion from WebSocket:', newComment);
+            return {
+              ...prevTask,
+              discussions: [...prevTask.discussions, newComment]
+            };
+          }
+          return prevTask; // Возвращаем предыдущее состояние, если обновление не требуется
+        });
+      }
+    };
+
+    eventBus.on('ws-data-update', handleUpdate);
+
+    // Очистка при размонтировании компонента
+    return () => {
+      eventBus.remove('ws-data-update', handleUpdate);
+    };
+  }, [task?.id]); // Зависимость от id задачи, чтобы переподписаться при смене задачи
 
   // Обработчики действий
   const handleSubmitComment = async () => {
@@ -1180,16 +1211,32 @@ const TaskDetail = () => {
 
               {task?.discussions?.length > 0 ? (
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 1 }}>
-                  {task.discussions.map(discussion => (
-                    <Box key={discussion.id} sx={{ mb: 1 }}>
-                      <Typography variant="caption" fontWeight="bold">
-                        {discussion.author_details?.full_name || 'Пользователь'}:
-                      </Typography>
-                      <Typography variant="body2">
-                        {discussion.content}
-                      </Typography>
-                    </Box>
-                  ))}
+                  {task.discussions
+                    .filter(discussion => !discussion.is_system)
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .map(discussion => {
+                      const formattedDate = discussion.created_at 
+                        ? new Date(discussion.created_at).toLocaleString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          }).replace(',', ' - ')
+                        : '';
+                        
+                      return (
+                        <Box key={discussion.id} sx={{ mb: 1 }}>
+                          <Typography variant="caption" fontWeight="bold">
+                            [{formattedDate}] {discussion.author_details?.full_name || 'Пользователь'}:
+                          </Typography>
+                          <Typography variant="body2">
+                            {discussion.content}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary">

@@ -1,84 +1,111 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.db.models import Q
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.user_id = self.scope['user'].id if self.scope['user'].is_authenticated else None
-        self.tasks_group_name = 'tasks_updates' # Группа для обновлений задач
+        # --- НАЧАЛО ДИАГНОСТИЧЕСКОГО БЛОКА ---
+        print("--- [DIAGNOSTIC] WebSocket connect attempt ---")
+        
+        user = self.scope.get('user')
+        
+        # Выводим всего пользователя и его статус аутентификации
+        print(f"--- [DIAGNOSTIC] Scope user: {user}")
+        print(f"--- [DIAGNOSTIC] Is authenticated: {user.is_authenticated}")
+        
+        # Выводим заголовки, чтобы проверить наличие cookie
+        headers = dict(self.scope['headers'])
+        print(f"--- [DIAGNOSTIC] Request headers: {headers}")
+        # --- КОНЕЦ ДИАГНОСТИЧЕСКОГО БЛОКА ---
 
-        if self.user_id:
-            self.user_group_name = f'user_{self.user_id}'
+        if user and user.is_authenticated:
+            self.user = user
+            self.user_id = self.user.id
+            await self.accept()
+            print(f"--- Connection ACCEPTED for user {self.user_id} ---")
+            
+            # Добавляем пользователя в его личную группу для уведомлений
             await self.channel_layer.group_add(
-                self.user_group_name,
+                f"user_{self.user_id}",
                 self.channel_name
             )
-            print(f"User {self.user_id} connected, channel_name: {self.channel_name}, joined group: {self.user_group_name}")
         else:
-            print(f"Anonymous user connected, channel_name: {self.channel_name}")
+            print("--- Connection REJECTED ---")
+            await self.close()
 
-        # Все пользователи (аутентифицированные и анонимные, если разрешено) подписываются на обновления задач
-        await self.channel_layer.group_add(
-            self.tasks_group_name,
-            self.channel_name
-        )
-        print(f"Channel {self.channel_name} joined group: {self.tasks_group_name}")
+
+    @database_sync_to_async
+    def get_user_task_groups(self):
+        from .models import Task
+        # Находим все задачи, где пользователь является автором, исполнителем, участником или наблюдателем
+        tasks = Task.objects.filter(
+            Q(author=self.user) |
+            Q(executor=self.user) |
+            Q(participants=self.user) |
+            Q(observers=self.user)
+        ).distinct()
+        return [f'task_{task.id}' for task in tasks]
+
+    async def connect(self):
+        self.user = self.scope['user']
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.user_id = self.user.id
+        self.user_group_name = f'user_{self.user_id}'
+
+        # Подписка на персональную группу
+        await self.channel_layer.group_add(self.user_group_name, self.channel_name)
+        print(f"User {self.user_id} connected, joined personal group: {self.user_group_name}")
+
+        # Получаем и подписываемся на группы всех связанных задач
+        self.task_groups = await self.get_user_task_groups()
+        for group_name in self.task_groups:
+            await self.channel_layer.group_add(group_name, self.channel_name)
+        
+        print(f"User {self.user_id} subscribed to task groups: {self.task_groups}")
 
         await self.accept()
-        
         await self.send(text_data=json.dumps({
             'type': 'connection_established',
             'message': 'Successfully connected to WebSocket!'
         }))
-        
-        # Это тестовое уведомление можно оставить или убрать, если оно больше не нужно для отладки
-        # await self.send(text_data=json.dumps({
-        #     'type': 'notification',
-        #     'payload': {
-        #         'title': 'Тестовое событие!',
-        #         'message': 'Это тестовое уведомление отправлено с сервера сразу после подключения.',
-        #         'level': 'info'
-        #     }
-        # }))
 
     async def disconnect(self, close_code):
-        if hasattr(self, 'user_group_name') and self.user_group_name:
-            await self.channel_layer.group_discard(
-                self.user_group_name,
-                self.channel_name
-            )
-            print(f"User {self.user_id} disconnected, removed from group: {self.user_group_name}")
-        
-        # Отписка от группы обновлений задач
-        await self.channel_layer.group_discard(
-            self.tasks_group_name,
-            self.channel_name
-        )
-        print(f"Channel {self.channel_name} removed from group: {self.tasks_group_name}")
+        if not hasattr(self, 'user') or not self.user.is_authenticated:
+            return
 
-        if not hasattr(self, 'user_group_name') or not self.user_group_name : # если был аноним
-             print(f"Anonymous/Unidentified user disconnected, channel_name: {self.channel_name}")
+        # Отписка от персональной группы
+        await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
+        print(f"User {self.user_id} disconnected, removed from personal group: {self.user_group_name}")
 
+        # Отписка от всех групп задач
+        if hasattr(self, 'task_groups'):
+            for group_name in self.task_groups:
+                await self.channel_layer.group_discard(group_name, self.channel_name)
+            print(f"User {self.user_id} unsubscribed from task groups: {self.task_groups}")
 
-    async def send_notification(self, event): # Этот метод для "старых" уведомлений, если они еще используются
-        message_content = event['message']
-        print(f"Sending legacy notification to user {self.user_id} via WebSocket: {message_content}")
+    async def data_update(self, event):
+        """
+        Обрабатывает сообщения об обновлении данных, отправленные из views.py (например, новые комментарии).
+        """
+        payload = event['payload']
+        print(f"Sending 'data_update' to user {self.user_id} with payload: {payload}")
         await self.send(text_data=json.dumps({
-            'type': 'notification',
-            'payload': message_content
+            'type': 'data_update',
+            'data': payload
         }))
 
-    # Новый метод для обработки сообщений об обновлении данных
     async def data_update_message(self, event):
         """
-        Отправляет сообщение об обновлении данных клиенту.
-        'event' содержит {'type': 'data_update_message', 'data': message_data_from_signal}
+        Обрабатывает сообщения, отправленные из сигналов (например, при изменении статуса задачи).
         """
-        update_data = event['data'] # Это message_data из сигнала
-        
-        print(f"Sending data update to channel {self.channel_name} for group {self.tasks_group_name}: {update_data}")
-
-        # Отправляем клиенту сообщение с типом 'data_update'
+        update_data = event['data']
+        print(f"Sending 'data_update_message' to user {self.user_id}: {update_data}")
         await self.send(text_data=json.dumps({
-            'type': 'data_update', # Этот тип будет ловить фронтенд
+            'type': 'data_update',
             'data': update_data
         }))

@@ -1,18 +1,17 @@
 import os
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack  # Для аутентификации в WebSockets
+# Возвращаем AuthMiddlewareStack - правильный инструмент для этой задачи
+from channels.auth import AuthMiddlewareStack
 import crm.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-# Базовое Django ASGI приложение для HTTP запросов
-django_asgi_app = get_asgi_application()
 
 application = ProtocolTypeRouter({
-    "http": django_asgi_app,
+    "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
         URLRouter(
-            crm.routing.websocket_urlpatterns  # Пути для WebSocket
+            crm.routing.websocket_urlpatterns
         )
     ),
 })

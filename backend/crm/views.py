@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model, authenticate, login
 from rest_framework import generics, viewsets, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -18,6 +18,8 @@ from .permissions import IsDealAccess, NotCallOperator, CanAccessTask
 from .serializers import CompanySerializer, ContactSerializer, LeadSerializer, DealSerializer, InquirySerializer, \
     DealEventSerializer, NextStepSerializer, CustomUserSerializer, UserRegistrationSerializer, ManualLeadCreateSerializer
 from .serializers import TaskSerializer, TaskDiscussionSerializer, TaskChangeLogSerializer, TaskAttachmentSerializer
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .services import convert_inquiry, create_lead_manually
 
 
@@ -204,7 +206,8 @@ class UserLoginView(APIView):
             )
 
         user = authenticate(request, username=email, password=password)
-        if user is not None:
+        if user:
+            login(request, user)  # Создаем сессию для пользователя
             token, _ = Token.objects.get_or_create(user=user)
             return Response({
                 "token": token.key,
@@ -430,8 +433,34 @@ class TaskDiscussionViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        # Автоматически устанавливаем текущего пользователя как автора сообщения
-        serializer.save(author=self.request.user, is_system=False)
+        # Сохраняем комментарий и получаем его объект
+        discussion = serializer.save(author=self.request.user, is_system=False)
+        
+        # Получаем задачу
+        task = discussion.task
+        
+        # Получаем слой каналов для отправки сообщения
+        channel_layer = get_channel_layer()
+        group_name = f'task_{task.id}' # Имя группы соответствует задаче
+        
+        # Сериализуем новый комментарий, чтобы отправить его данные
+        # Убедимся, что используем тот же контекст, что и при обычном запросе
+        discussion_data = TaskDiscussionSerializer(discussion, context={'request': self.request}).data
+        
+        # Формируем сообщение для WebSocket
+        message = {
+            'type': 'data_update', # Тип события для consumer
+            'payload': {
+                'model': 'discussion',
+                'data': discussion_data
+            }
+        }
+        
+        # Асинхронно отправляем сообщение в группу
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            message
+        )
 
 
 class TaskAttachmentViewSet(viewsets.ModelViewSet):

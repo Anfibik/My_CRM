@@ -19,6 +19,7 @@ import TaskDetailPage from './pages/TaskDetailPage';
 import UserAuthModal from './components/auth/UserAuthModal';
 import { Box } from '@mui/material';
 import NavigationBar from './components/layout/NavigationBar';
+import eventBus from './utils/eventBus';
 
 const TasksKanbanPage = lazy(() => import('./pages/TasksKanbanPage'));
 
@@ -40,7 +41,7 @@ const AppContent = () => {
     if (isAuthenticated && user) {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsHost = 'localhost:8000';
-      const socketUrl = `${wsProtocol}//${wsHost}/ws/notifications/`;
+      const socketUrl = `ws://127.0.0.1:8000/ws/notifications/`;
 
       console.log(`Attempting to connect to WebSocket at: ${socketUrl} for user ${user?.id || 'unknown'} (Auth loaded)`);
 
@@ -67,6 +68,7 @@ const AppContent = () => {
           console.log('Received legacy notification (frontend):', data.payload);
         } else if (data.type === 'data_update') {
           console.log('Received data update (frontend):', data.data);
+          eventBus.dispatch('ws-data-update', data.data);
         }
       };
 
