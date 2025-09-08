@@ -1,11 +1,41 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Divider, Chip, Button, Grid,
-  Avatar, TextField, CircularProgress, IconButton, Tooltip,
-  Card, CardContent, List, ListItem, ListItemText, Menu, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, Autocomplete,
-  Checkbox, useTheme // Добавляем useTheme
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  TextField,
+  Typography,
+  Chip,
+  Checkbox,
+  Avatar,
+  Divider,
+  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  FormHelperText,
+  Alert,
+  Snackbar,
+  ListItemIcon,
+  ListItemText,
+  Tabs,
+  Tab,
+  Grid,
+  List,
+  ListItem,
+  Card,
+  CardContent,
+  Autocomplete
 } from '@mui/material';
 import api from '../../api/config.js'; // Импортируем наш экземпляр api
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -24,6 +54,25 @@ import { getDeadlineInfo } from '../../utils/deadlineUtils.js'; // Исправ�
 import { TASK_TYPE_LABELS } from '../../constants.js';
 import eventBus from '../../utils/eventBus.js';
 import { useAuth } from '../../context/AuthContext.js';
+
+// Компонент для отображения содержимого вкладок
+function TabPanel({ children, value, name, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== name}
+      id={`tabpanel-${name}`}
+      aria-labelledby={`tab-${name}`}
+      {...other}
+    >
+      {value === name && (
+        <Box sx={{ p: 1 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 
 const TaskDetail = () => {
   const theme = useTheme(); // Вызываем хук useTheme в начале компонента
@@ -44,6 +93,9 @@ const TaskDetail = () => {
   const [isUpdatingParticipants, setIsUpdatingParticipants] = useState(false);
   const [isUpdatingObservers, setIsUpdatingObservers] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [resultDialogOpen, setResultDialogOpen] = useState(false);
+  const [resultText, setResultText] = useState('');
+  const [activeTab, setActiveTab] = useState('description');
 
   // Состояние для управления выпадающим меню статусов
   const [statusAnchorEl, setStatusAnchorEl] = useState(null);
@@ -186,7 +238,15 @@ const TaskDetail = () => {
   const handleChangeStatus = async (newStatus) => {
     try {
       setChangingStatus(true);
-      const response = await api.patch(`/api/tasks/${id}/`, { // Исправлен URL
+      
+      if (newStatus === 'completed') {
+        // Если выбран статус 'выполнена', открываем диалог для ввода результата
+        setResultText(task.result || ''); // Заполняем текущим результатом, если он есть
+        setResultDialogOpen(true);
+        return;
+      }
+      
+      const response = await api.patch(`/api/tasks/${id}/`, {
         status: newStatus
       });
       setTask(prevTask => ({ ...prevTask, status: response.data.status, status_changed_at: response.data.status_changed_at }));
@@ -194,7 +254,28 @@ const TaskDetail = () => {
       console.error('Ошибка при изменении статуса:', err);
     } finally {
       setChangingStatus(false);
-      setStatusAnchorEl(null); // Закрываем меню после изменения статуса
+      setStatusAnchorEl(null);
+    }
+  };
+
+  // Обработчик сохранения результата
+  const handleSaveResult = async () => {
+    try {
+      const response = await api.patch(`/api/tasks/${id}/`, {
+        status: 'completed',
+        result: resultText
+      });
+      
+      setTask(prevTask => ({
+        ...prevTask,
+        status: 'completed',
+        result: response.data.result,
+        status_changed_at: response.data.status_changed_at
+      }));
+      
+      setResultDialogOpen(false);
+    } catch (err) {
+      console.error('Ошибка при сохранении результата:', err);
     }
   };
 
@@ -1193,20 +1274,50 @@ const TaskDetail = () => {
 
           {/* Основная область контента */}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Описание задачи */}
+            {/* Описание задачи с вкладками */}
             <Box sx={{ height: '60%', p: 2, overflowY: 'auto', mr: '30px' }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Форма заполнения, детализация, описание
-              </Typography>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                {task?.description || 'Описание отсутствует'}
-              </Typography>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                <Tabs 
+                  value={activeTab} 
+                  onChange={(e, newValue) => setActiveTab(newValue)}
+                  aria-label="task details tabs"
+                >
+                  <Tab label="Описание" value="description" />
+                  <Tab 
+                    label="Результат" 
+                    value="result" 
+                    disabled={task?.status !== 'completed'}
+                  />
+                </Tabs>
+              </Box>
+              
+              {/* Вкладка с описанием */}
+              <TabPanel value={activeTab} name="description">
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {task?.description || 'Описание отсутствует'}
+                </Typography>
+              </TabPanel>
+              
+              {/* Вкладка с результатом */}
+              <TabPanel value={activeTab} name="result">
+                {task?.status === 'completed' ? (
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                    {task?.result || 'Результат не указан'}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Доступно после выполнения задачи
+                  </Typography>
+                )}
+              </TabPanel>
             </Box>
+            
+
 
             {/* Обсуждение */}
             <Box sx={{ height: '40%', display: 'flex', flexDirection: 'column', borderTop: '1px solid #ccc', p: 2, mr: '30px' }}>
               <Typography variant="h6" gutterBottom>
-                Обсуждение
+                Лента
               </Typography>
 
               {task?.discussions?.length > 0 ? (
@@ -1537,6 +1648,41 @@ const TaskDetail = () => {
             variant="contained"
             disabled={isUpdatingObservers}
             startIcon={isUpdatingObservers ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            Сохранить
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Модальное окно для ввода результата */}
+      <Dialog open={resultDialogOpen} onClose={() => setResultDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Введите результат выполнения задачи</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, mb: 3 }}>
+            <TextField
+              multiline
+              rows={8}
+              fullWidth
+              variant="outlined"
+              placeholder="Опишите результат выполнения задачи..."
+              value={resultText}
+              onChange={(e) => setResultText(e.target.value)}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => setResultDialogOpen(false)}
+            variant="outlined"
+            color="inherit"
+          >
+            Отмена
+          </Button>
+          <Button 
+            onClick={handleSaveResult}
+            variant="contained"
+            color="primary"
+            disabled={!resultText.trim()}
           >
             Сохранить
           </Button>

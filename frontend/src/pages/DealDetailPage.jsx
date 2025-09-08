@@ -223,7 +223,7 @@ const DealDetailPage = () => {
     { value: "identifying_need", label: "Выявление потребности" },
     { value: "solution", label: "Подготовка решения" },
     { value: "commercial_offer", label: "Презентация КП" },
-    { value: "objections", label: "Работа с возражениями" },
+    { value: "objections", label: "Доработка" },
     { value: "auction", label: "Торг" },
     { value: "contract", label: "Подписание договора" },
     { value: "prepay", label: "Получение предоплаты" },
@@ -237,11 +237,11 @@ const DealDetailPage = () => {
   const currentIndex = stages.findIndex(stage => stage.value === deal.status);
 
   return (
-    <div className="deal-page-container h-[800px] bg-red-100 flex flex-col">
+    <div className="deal-page-container h-[800px] flex flex-col">
       {deal && (
         <header className="bg-white shadow p-2 m-2">
           {/* Информационная строка состояния (жёлтая) */}
-          <div className="bg-yellow-100 p-1 mb-1 flex justify-between items-center">
+          <div className="p-1 mb-1 flex justify-between items-center">
             <div className="flex space-x-6 items-center">
               <h2 className="text-xl font-bold">{deal.name || "Без названия"}</h2>
             </div>
@@ -344,7 +344,7 @@ const DealDetailPage = () => {
       <NextStepPopup
         isOpen={showNextStepPopup}
         onClose={() => setShowNextStepPopup(false)}
-        onSubmit={async (nextStepText, nextStepDateTime) => {
+        onSubmit={async (nextStepText, nextStepDateTime, createTask = true) => {
           try {
             // Сначала создаём событие сделки
             const eventResponse = await api.post("/api/deal-events/", {
@@ -358,7 +358,7 @@ const DealDetailPage = () => {
             const nextStepResponse = await api.post("/api/next-steps/", {
               deal: deal.id,
               description: nextStepText,
-              deadline: nextStepDateTime, // Исходная строка от datetime-local
+              deadline: nextStepDateTime,
               event: eventId,
             });
             // Обновляем локальные данные
@@ -373,41 +373,35 @@ const DealDetailPage = () => {
             setLastNextStepDue(nextStepDateTime);
             await fetchDealEvents();
 
-            // ---- НАЧАЛО НОВОГО КОДА ДЛЯ СОЗДАНИЯ ЗАДАЧИ ----
-            try {
-              const taskDetails = {
-                title: `${deal.name} - Следующий шаг`,
-                description: nextStepText,
-                dealId: deal.id,
-                taskType: 'step',
-                deadline: nextStepDateTime ? new Date(nextStepDateTime).toISOString() : null,
-                executorId: deal.responsible?.id, // Используем deal.responsible.id
-                priority: 'low',
-                status: 'not_accepted',
-              };
-              const createdTask = await createTask(taskDetails);
-              
-              // Отправляем событие для TasksArea, чтобы он обновил список задач
-              if (createdTask && createdTask.id && deal && deal.id) {
-                eventBus.dispatch('taskAutomaticallyCreated', { 
-                  dealId: deal.id, // Используем deal.id из текущего контекста DealDetailPage
-                  taskId: createdTask.id 
-                });
-              } else {
-                if (deal && deal.id) {
-                    eventBus.dispatch('taskAutomaticallyCreated', { 
-                        dealId: deal.id,
-                        taskId: createdTask?.id || null 
-                    });
-                } else {
-                    console.error('DealDetailPage: Не удалось отправить событие taskAutomaticallyCreated. Отсутствует deal.id.');
+            // Создаем задачу, только если createTask === true
+            console.log('Создание задачи. createTask =', createTask);
+            if (createTask) {
+              try {
+                const taskDetails = {
+                  title: `${deal.name} - Следующий шаг`,
+                  description: nextStepText,
+                  dealId: deal.id,
+                  task_type: 'step',  // Изменено с taskType на task_type
+                  deadline: nextStepDateTime ? new Date(nextStepDateTime).toISOString() : null,
+                  executorId: deal.responsible?.id,
+                  priority: 'low',
+                  status: 'not_accepted',
+                };
+                console.log('Параметры задачи:', taskDetails);
+                const createdTask = await createTask(taskDetails);
+                console.log('Задача создана:', createdTask);
+                
+                // Отправляем событие для TasksArea, чтобы он обновил список задач
+                if (createdTask?.id && deal?.id) {
+                  eventBus.dispatch('taskAutomaticallyCreated', { 
+                    dealId: deal.id,
+                    taskId: createdTask.id 
+                  });
                 }
+              } catch (taskError) {
+                console.error("Ошибка при автоматическом создании задачи для следующего шага:", taskError);
               }
-
-            } catch (taskError) {
-              console.error("Ошибка при автоматическом создании задачи для следующего шага:", taskError);
             }
-            // ---- КОНЕЦ НОВОГО КОДА ДЛЯ СОЗДАНИЯ ЗАДАЧИ ----
 
             // Сброс формы и закрытие попапа
             setEventText("");

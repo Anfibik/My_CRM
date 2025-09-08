@@ -97,7 +97,7 @@ const CentralWorkBar = ({
 
   return (
     <Box sx={{ width: '100%', px: 0.5 }}>
-      <main className="p-2 m-1 bg-green-50 rounded shadow">
+      <main className="p-2 m-1 rounded shadow">
         <div className="flex items-start">
           <div className="w-1/2">
             <textarea

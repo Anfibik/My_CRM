@@ -271,7 +271,7 @@ class Deal(models.Model):
             ("identifying_need", "Выявление потребности"),
             ("solution", "Подготовка решения"),
             ("commercial_offer", "Презентация КП"),
-            ("objections", "Работа с возражениями"),
+            ("objections", "Доработка"),
             ("auction", "Торг"),
             ("contract", "Подписание договора"),
             ("prepay", "Получение предоплаты"),
@@ -487,6 +487,7 @@ class Task(models.Model):
     # Основные поля
     title = models.CharField(max_length=255, verbose_name="Заголовок задачи")
     description = models.TextField(verbose_name="Описание задачи")
+    result = models.TextField(verbose_name="Результат по задаче", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
     deadline = models.DateTimeField(null=True, blank=True, verbose_name="Дедлайн")
